@@ -1,0 +1,10 @@
+pyTelegramBotAPI
+pymupdf
+requests
+python-dotenv
+numpy
+pytesseract
+pillow
+langchain
+scikit-learn
+pyPDF2
