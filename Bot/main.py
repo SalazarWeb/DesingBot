@@ -36,6 +36,16 @@ def register_handlers(bot, bot_handler: BotHandler):
         logger.info(f"Comando /start recibido de usuario {message.from_user.id}")
         bot_handler.start(message)
 
+    @bot.message_handler(commands=['help'])
+    def help_command(message):
+        logger.info(f"Comando /help recibido de usuario {message.from_user.id}")
+        bot_handler.show_help(message)
+
+    @bot.message_handler(commands=['list'])
+    def list_command(message):
+        logger.info(f"Comando /list recibido de usuario {message.from_user.id}")
+        bot_handler.list_categories(message)
+
     # Comandos especializados en UX/UI Design
     @bot.message_handler(commands=["design"])
     def design(message):
@@ -67,10 +77,32 @@ def register_handlers(bot, bot_handler: BotHandler):
         logger.info(f"Comando /search recibido de usuario {message.from_user.id}: '{message.text}'")
         bot_handler.handle_embedding_search(message)
 
-    @bot.message_handler(commands=["help"])
-    def help_command(message):
-        logger.info(f"Comando /help recibido de usuario {message.from_user.id}")
-        bot_handler.show_help(message)
+    # Nuevos comandos avanzados
+    @bot.message_handler(commands=['preferences', 'config'])
+    def preferences_command(message):
+        logger.info(f"Comando /preferences recibido de usuario {message.from_user.id}")
+        bot_handler.handle_preferences_command(message)
+
+    @bot.message_handler(commands=['analytics', 'stats'])
+    def analytics_command(message):
+        logger.info(f"Comando /analytics recibido de usuario {message.from_user.id}")
+        bot_handler.handle_analytics_command(message)
+
+    @bot.message_handler(commands=['trending', 'popular'])
+    def trending_command(message):
+        logger.info(f"Comando /trending recibido de usuario {message.from_user.id}")
+        bot_handler.handle_trending_command(message)
+
+    @bot.message_handler(commands=['tips', 'advice'])
+    def tips_command(message):
+        logger.info(f"Comando /tips recibido de usuario {message.from_user.id}")
+        bot_handler.handle_tips_command(message)
+
+    # Comandos de administración
+    @bot.message_handler(commands=['admin'])
+    def admin_command(message):
+        logger.info(f"Comando /admin recibido de usuario {message.from_user.id}")
+        bot_handler.handle_admin_command(message)
 
     # Callbacks para interacciones con botones
     @bot.callback_query_handler(func=lambda call: call.data.startswith("list_"))
@@ -99,6 +131,12 @@ def register_handlers(bot, bot_handler: BotHandler):
         logger.info(f"Callback search_help recibido de usuario {call.from_user.id}")
         bot_handler.start(call)
 
+    # Handler principal para todos los demás callbacks (onboarding, preferencias, admin, etc.)
+    @bot.callback_query_handler(func=lambda call: True)
+    def callback_query_handler(call):
+        logger.info(f"Callback genérico recibido de usuario {call.from_user.id}: {call.data}")
+        bot_handler.handle_callback_query(call)
+
     # Mensajes de texto y comandos no reconocidos
     @bot.message_handler(func=lambda message: True, content_types=["text"])
     def handle_text(message):
@@ -114,6 +152,7 @@ def register_handlers(bot, bot_handler: BotHandler):
 
 
 def main():
+    """Función principal para ejecutar el bot con funcionalidades avanzadas"""
     load_dotenv()
     logger = setup_logging()
     logger.info("=== INICIANDO BOT ===")
@@ -141,9 +180,16 @@ def main():
         logger.info("Registrando handlers...")
         register_handlers(bot, bot_handler)
 
-        # Iniciar el bot
+        # Inicio del bot con mensaje mejorado
         logger.info("Bot completamente configurado y listo para recibir mensajes")
         logger.info("Iniciando infinity_polling...")
+        print("🎨 DesignBot UX/UI con funcionalidades avanzadas iniciando...")
+        print("✅ Onboarding inteligente activado")
+        print("🔍 Búsqueda contextual habilitada") 
+        print("🤖 IA adaptativa configurada")
+        print("📊 Sistema de analytics en funcionamiento")
+        print("⚙️ Comandos de administración disponibles")
+        print("🚀 Bot listo para interacciones avanzadas!")
         bot.infinity_polling()
 
     except Exception as e:

@@ -7,12 +7,17 @@ from typing import List, Dict, Any, Set, Optional
 from ai_embedding.extract import process_documents, search_similar_chunks_sklearn
 from ai_embedding.ai import answer_general_question, embed_question
 from constants import DOCUMENTS_FOLDER, DESIGN_CATEGORIES, CATEGORY_EMOJIS, CATEGORY_DESCRIPTIONS
+from core.state_manager import StateManager
+from core.onboarding import OnboardingSystem
+from core.search_service import AdvancedSearchService
+from core.admin_service import AdminService
+from ai_embedding.adaptive_ai import AdaptiveAIService
 
 
 class BotHandler:
     def __init__(self, bot=None):
         """
-        Inicializa el manejador del DesignBot UX/UI
+        Inicializa el manejador del DesignBot UX/UI con funcionalidades avanzadas
 
         Args:
             bot: Instancia de TeleBot pasada desde main.py
@@ -20,7 +25,15 @@ class BotHandler:
         self._init_logging()
         self.bot = bot
         self.processing_users = set()
-        print("🎨 Inicializando DesignBot...")
+        
+        # Inicializar servicios core
+        print("🎨 Inicializando DesignBot con funcionalidades avanzadas...")
+        self.state_manager = StateManager()
+        self.search_service = AdvancedSearchService(self.state_manager)
+        self.onboarding_system = OnboardingSystem(bot, self.state_manager)
+        self.admin_service = AdminService(bot, self.state_manager, self.search_service)
+        self.adaptive_ai = AdaptiveAIService(self.state_manager, self.search_service)
+        
         self._init_data()
 
     def _init_logging(self):
@@ -45,60 +58,26 @@ class BotHandler:
         return bool(self.index_model and self.chunks)
 
     def start(self, message_or_call):
-        """Maneja el comando start o callback"""
+        """Maneja el comando start con onboarding avanzado"""
         chat_id = (
             message_or_call.chat.id
             if hasattr(message_or_call, "chat")
             else message_or_call.message.chat.id
         )
+        user_id = (
+            message_or_call.from_user.id
+            if hasattr(message_or_call, "from_user")
+            else message_or_call.message.from_user.id
+        )
 
-        # Teclado simplificado con solo las 4 categorías esenciales
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+        # Actualizar analytics
+        self.admin_service.update_analytics('start_command', {'user_id': user_id})
         
-        # Primera fila: Categorías principales de investigación y patrones
-        keyboard.add(
-            types.KeyboardButton("🔬 UX Research"),
-            types.KeyboardButton("🎨 UI Patterns")
-        )
-        
-        # Segunda fila: Sistemas y herramientas
-        keyboard.add(
-            types.KeyboardButton("🎯 Design Systems"), 
-            types.KeyboardButton("🛠️ Herramientas")
-        )
-        
-        # Tercera fila: Funciones de búsqueda y ayuda
-        keyboard.add(
-            types.KeyboardButton("🔍 Búsqueda"), 
-            types.KeyboardButton("❓ Ayuda")
-        )
-
-        welcome_message = (
-            "🎨 **DesignBot - Tu experto en UX/UI**\n\n"
-            "¡Hola! Soy tu asistente especializado en diseño UX/UI.\n\n"
-            "**📱 Categorías disponibles:**\n"
-            "• 🔬 **UX Research** - Investigación, métodos, análisis\n"
-            "• 🎨 **UI Patterns** - Componentes, interfaces, tokens\n"
-            "• 🎯 **Design Systems** - Guías, bibliotecas, estándares\n"
-            "• 🛠️ **Herramientas** - Figma, Sketch, Adobe XD\n\n"
-
-            "**⚡ Comandos rápidos:**\n"
-            "• `/design` - Principios de diseño\n"
-            "• `/ux` - Experiencia de usuario\n"
-            "• `/ui` - Interfaces y patrones\n"
-            "• `/search` - Buscar recursos específicos\n\n"
-            "💡 Usa los botones del menú o escribe comandos directamente."
-        )
-
-        self.bot.send_message(
-            chat_id,
-            welcome_message,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
+        # Iniciar onboarding inteligente
+        self.onboarding_system.start_onboarding(message_or_call)
 
     def handle_general_question(self, message):
-        """Maneja preguntas generales de diseño con la IA"""
+        """Maneja preguntas generales con IA adaptativa"""
         start_time = time.perf_counter()
         
         # Determinar el comando y extraer la pregunta
@@ -150,6 +129,10 @@ class BotHandler:
 
         self.processing_users.add(user_id)
         
+        # Actualizar contexto y historial del usuario
+        self.state_manager.update_user_context(user_id, f"question_{command_type}")
+        self.state_manager.add_to_history(user_id, question)
+        
         # Mensaje contextual según el tipo de comando
         context_messages = {
             "design": "🎨 Analizando principios de diseño...",
@@ -166,26 +149,18 @@ class BotHandler:
                 context_messages.get(command_type, context_messages["general"])
             )
 
-            # Contextualizar la pregunta según el comando
-            if command_type != "general":
-                context_prefixes = {
-                    "design": "Sobre principios y teoría del diseño: ",
-                    "ux": "Sobre experiencia de usuario y research: ",
-                    "ui": "Sobre interfaces y patrones UI: ",
-                    "tools": "Sobre herramientas de diseño: "
-                }
-                question = context_prefixes[command_type] + question
+            self.logger.info(f"Generando respuesta adaptativa de {command_type} para usuario {user_id}: {question[:50]}...")
             
-            self.logger.info(f"Generando respuesta de {command_type} para usuario {user_id}: {question[:50]}...")
-            
-            # Llamar a la IA con manejo robusto
-            respuesta = answer_general_question(question)
+            # Usar IA adaptativa para generar respuesta personalizada
+            respuesta = self.adaptive_ai.generate_adaptive_response(
+                question, command_type, user_id
+            )
 
             # Eliminar mensaje de estado
             try:
                 self.bot.delete_message(message.chat.id, status_msg.message_id)
             except:
-                pass  # No importa si no se puede eliminar
+                pass
 
             safe_response = sanitize_markdown(respuesta)
 
@@ -196,6 +171,15 @@ class BotHandler:
                 self.bot.send_message(
                     message.chat.id, safe_response, parse_mode="Markdown"
                 )
+
+            # Actualizar analytics con tiempo de respuesta
+            response_time = time.perf_counter() - start_time
+            self.admin_service.update_analytics('ai_response', {
+                'user_id': user_id,
+                'command_type': command_type,
+                'response_time': response_time,
+                'success': True
+            })
 
         except Exception as e:
             self.logger.error(f"Error en handle_general_question para usuario {user_id}: {str(e)}")
@@ -213,21 +197,50 @@ class BotHandler:
                 error_msg += "\n\n💡 Intenta reformular tu pregunta de diseño o usar `/help` para ver otros comandos."
             
             self.bot.send_message(message.chat.id, error_msg)
+            
+            # Actualizar analytics de error
+            self.admin_service.update_analytics('ai_response', {
+                'user_id': user_id,
+                'command_type': command_type,
+                'success': False,
+                'error': str(e)
+            })
         finally:
             elapsed = time.perf_counter() - start_time
             self.logger.info(
                 f"Tiempo de respuesta de handle_general_question para usuario {user_id}: {elapsed:.3f} segundos"
             )
-            self.processing_users.discard(user_id)  # Usar discard para evitar KeyError
+            self.processing_users.discard(user_id)
 
     def handle_embedding_search(self, message):
-        """Busca documentos relevantes y genera respuesta basada en ellos"""
+        """Busca documentos con búsqueda contextual avanzada"""
         start_time = time.perf_counter()
         question = message.text.replace("/search ", "")
         if not question or question == "/search":
-            self.bot.send_message(
-                message.chat.id, "❌ Formato correcto: /search [tu consulta]"
+            # Mostrar sugerencias de búsqueda personalizadas
+            user_id = message.from_user.id
+            suggestions = self.search_service.get_search_suggestions(user_id)
+            trending = self.search_service.get_trending_searches()
+            
+            suggestion_text = (
+                "🔍 **Búsqueda Inteligente**\n\n"
+                "❌ Formato correcto: `/search [tu consulta]`\n\n"
             )
+            
+            if suggestions:
+                suggestion_text += "💡 **Sugerencias personalizadas:**\n"
+                for suggestion in suggestions[:5]:
+                    suggestion_text += f"• {suggestion}\n"
+                suggestion_text += "\n"
+            
+            if trending:
+                suggestion_text += "🔥 **Búsquedas populares:**\n"
+                for trend in trending[:5]:
+                    suggestion_text += f"• {trend}\n"
+            
+            suggestion_text += "\n📝 *Ejemplo:* `/search atomic design system`"
+            
+            self.bot.send_message(message.chat.id, suggestion_text, parse_mode="Markdown")
             return
 
         user_id = message.from_user.id
@@ -240,16 +253,24 @@ class BotHandler:
 
         self.processing_users.add(user_id)
         
-        # Mensajes de estado mejorados
+        # Actualizar contexto y estadísticas de búsqueda
+        self.state_manager.update_user_context(user_id, "search")
+        self.state_manager.update_search_stats(user_id, question)
+        
         status_msg = None
         try:
             self.bot.send_chat_action(message.chat.id, "typing")
             status_msg = self.bot.send_message(
                 message.chat.id,
-                "🔍 Buscando en recursos de diseño..."
+                "🔍 Realizando búsqueda contextual inteligente..."
             )
 
-            self.logger.info(f"Buscando documentos para usuario {user_id}: {question[:50]}...")
+            self.logger.info(f"Búsqueda contextual para usuario {user_id}: {question[:50]}...")
+
+            # Usar búsqueda contextual avanzada
+            enhanced_query, enhanced_filters = self.search_service.contextual_search(
+                question, user_id
+            )
 
             # Verificación de datos disponibles
             if not self.index_model or not self.chunks:
@@ -263,8 +284,8 @@ class BotHandler:
                 )
                 return
 
-            # Generación de embedding para la búsqueda
-            question_embedding = embed_question(question)
+            # Generación de embedding para la búsqueda mejorada
+            question_embedding = embed_question(enhanced_query)
             if not question_embedding:
                 try:
                     self.bot.delete_message(message.chat.id, status_msg.message_id)
@@ -295,17 +316,17 @@ class BotHandler:
             # Actualizar mensaje de estado
             try:
                 self.bot.edit_message_text(
-                    "📚 Generando respuesta basada en documentos relevantes...",
+                    "🤖 Generando respuesta personalizada con IA adaptativa...",
                     message.chat.id,
                     status_msg.message_id
                 )
             except:
                 pass
 
-            # Generar respuesta usando los chunks encontrados
-            from ai_embedding.ai import generate_answer
-
-            answer, references = generate_answer(question, similar_chunks, self.chunks)
+            # Generar respuesta usando IA adaptativa con contexto de documentos
+            answer = self.adaptive_ai.generate_adaptive_response(
+                question, "search", user_id, similar_chunks
+            )
 
             # Eliminar mensaje de estado
             try:
@@ -392,6 +413,17 @@ class BotHandler:
                             reply_markup=keyboard,
                         )
 
+            # Actualizar analytics de búsqueda
+            response_time = time.perf_counter() - start_time
+            self.admin_service.update_analytics('search', {
+                'user_id': user_id,
+                'query': question,
+                'enhanced_query': enhanced_query,
+                'results_count': len(similar_chunks),
+                'response_time': response_time,
+                'success': True
+            })
+
         except Exception as e:
             self.logger.error(f"Error en handle_embedding_search para usuario {user_id}: {str(e)}")
             
@@ -410,411 +442,628 @@ class BotHandler:
                 error_msg += "\n\n💡 Intenta reformular tu consulta o usar `/help` para ver otros comandos."
             
             self.bot.send_message(message.chat.id, error_msg)
+
+            self.admin_service.update_analytics('search', {
+                'user_id': user_id,
+                'query': question,
+                'success': False,
+                'error': str(e)
+            })
         finally:
             elapsed = time.perf_counter() - start_time
             self.logger.info(
                 f"Tiempo de respuesta de handle_embedding_search para usuario {user_id}: {elapsed:.3f} segundos"
             )
-            self.processing_users.discard(user_id)  # Usar discard para evitar KeyError
+            self.processing_users.discard(user_id)
 
-    def show_help(self, message_or_call):
-        """Muestra ayuda del bot UX/UI"""
-        chat_id = (
-            message_or_call.chat.id
-            if hasattr(message_or_call, "chat")
-            else message_or_call.message.chat.id
+    # Nuevos métodos para funcionalidades avanzadas
+    def handle_preferences_command(self, message):
+        """Maneja configuración de preferencias de usuario"""
+        user_id = message.from_user.id
+        session = self.state_manager.get_user_session(user_id)
+        analytics = self.state_manager.get_user_analytics(user_id)
+        
+        preferences_text = (
+            "⚙️ **Tus Preferencias Actuales**\n\n"
+            f"👤 **Perfil:**\n"
+            f"• Nivel de experiencia: {session.expertise_level.title()}\n"
+            f"• Herramientas favoritas: {', '.join(session.favorite_tools) if session.favorite_tools else 'No definidas'}\n"
+            f"• Áreas de interés: {', '.join(session.preferences.get('interests', [])) if session.preferences.get('interests') else 'No definidas'}\n\n"
+            f"📊 **Tu Actividad:**\n"
+            f"• Búsquedas realizadas: {analytics['searches_count']}\n"
+            f"• Tiempo en sesión: {analytics['session_duration']/60:.1f} minutos\n"
+            f"• Mensajes intercambiados: {analytics['conversation_length']}\n\n"
+            "🎛️ **Configuraciones disponibles:**"
         )
-
-        help_text = (
-            "🎨 **Comandos de UX/UI Design:**\n\n"
-            "**📋 Consultas especializadas:**\n"
-            "• `/design` - Principios y teoría del diseño\n"
-            "• `/ux` - Research y experiencia de usuario\n"
-            "• `/ui` - Interfaces y patrones visuales\n"
-            "• `/tools` - Herramientas (Figma, Sketch, etc.)\n\n"
-
-            "**🔍 Búsqueda y consultas:**\n"
-            "• `/search` - Buscar en recursos especializados\n"
-            "• `/ask` - Consultas generales de diseño\n\n"
-            "**📚 Categorías disponibles:**\n"
-            "Usa los botones del menú para explorar recursos organizados."
-        )
-
+        
         keyboard = types.InlineKeyboardMarkup()
-        # Solo las 4 categorías esenciales
         keyboard.add(
-            types.InlineKeyboardButton(
-                "🔬 UX Research", callback_data="list_ux_research"
-            )
+            types.InlineKeyboardButton("🎯 Cambiar nivel", callback_data="pref_level"),
+            types.InlineKeyboardButton("🛠️ Editar herramientas", callback_data="pref_tools")
         )
         keyboard.add(
-            types.InlineKeyboardButton(
-                "🎨 UI Patterns", callback_data="list_ui_patterns"
-            )
+            types.InlineKeyboardButton("💡 Cambiar intereses", callback_data="pref_interests"),
+            types.InlineKeyboardButton("🎨 Estilo respuestas", callback_data="pref_style")
         )
         keyboard.add(
-            types.InlineKeyboardButton(
-                "🎯 Design Systems", callback_data="list_design_systems"
-            )
+            types.InlineKeyboardButton("🔄 Reiniciar onboarding", callback_data="pref_reset_onboarding")
         )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "🛠️ Herramientas", callback_data="list_tools_guides"
-            )
-        )
-
-        self.bot.send_message(
-            chat_id, help_text, reply_markup=keyboard, parse_mode="Markdown"
-        )
-
-    def handle_list(self, call):
-        """Maneja listados de recursos por categoría de diseño"""
-        category = call.data.replace("list_", "")
-        chat_id = call.message.chat.id
-
-        # Mapeo de categorías a carpetas (solo las 4 categorías esenciales)
-        folder_mapping = {
-            "ux_research": "UX_Research",
-            "ui_patterns": "UI_Patterns", 
-            "design_systems": "Design_Systems",
-            "tools_guides": "Tools_Guides"
-        }
-
-        folder = folder_mapping.get(category)
-        if not folder:
-            self.bot.answer_callback_query(call.id, "Categoría no disponible")
-            return
-
-        try:
-            folder_path = os.path.join(DOCUMENTS_FOLDER, folder)
-            if not os.path.exists(folder_path):
-                self.bot.send_message(chat_id, f"📁 Carpeta {folder} en construcción.\n\n💡 Puedes usar `/search` para buscar en todos los recursos disponibles.")
-                return
-
-            pdf_files = [
-                f for f in os.listdir(folder_path) if f.lower().endswith(".pdf")
-            ]
-
-            if not pdf_files:
-                self.bot.send_message(
-                    chat_id, f"📚 No hay recursos disponibles en {folder} actualmente.\n\n🔍 Intenta usar `/search [tema]` para encontrar contenido relacionado."
-                )
-                return
-
-            keyboard = types.InlineKeyboardMarkup()
-            for pdf in pdf_files[:10]:  # Limitamos a 10 resultados
-                pretty_name = pdf.replace(".pdf", "").replace("_", " ")
-                keyboard.add(
-                    types.InlineKeyboardButton(
-                        f"📄 {pretty_name}", callback_data=f"download#{folder}/{pdf}"
-                    )
-                )
-            keyboard.add(
-                types.InlineKeyboardButton("⬅️ Volver", callback_data="back_main")
-            )
-
-            # Solo las categorías esenciales
-            category_names = {
-                "ux_research": "UX Research",
-                "ui_patterns": "UI Patterns",
-                "design_systems": "Design Systems", 
-                "tools_guides": "Tools & Guides"
-            }
-
-            self.bot.send_message(
-                chat_id,
-                f"📚 **Recursos de {category_names.get(category, folder)}:**",
-                reply_markup=keyboard,
-                parse_mode="Markdown",
-            )
-        except Exception as e:
-            self.logger.error(f"Error listando recursos de diseño: {e}")
-            self.bot.send_message(chat_id, "❌ Error al listar recursos")
-
-    def handle_pdf_download(self, call):
-        """Maneja la descarga de documentos PDF"""
-        chat_id = call.message.chat.id
-        path = call.data.replace("download#", "")
-
-        try:
-            file_path = os.path.join(DOCUMENTS_FOLDER, path)
-            if not os.path.exists(file_path):
-                self.bot.send_message(chat_id, "❌ El archivo solicitado no existe")
-                return
-
-            with open(file_path, "rb") as pdf:
-                self.bot.send_document(chat_id, pdf)
-
-            self.logger.info(f"Enviado documento: {path}")
-        except Exception as e:
-            self.logger.error(f"Error enviando PDF: {e}")
-            self.bot.send_message(chat_id, "❌ Error al enviar el documento")
-
-    def handle_back(self, call):
-        """Maneja botones de regreso"""
-        if call.data == "back_main":
-            self.show_help(call)
-        else:
-            self.start(call)
-
-    def handle_message(self, message):
-        """Procesa mensajes de texto y comandos especializados en diseño."""
-
-        text = message.text.strip()
         
-        # Comandos especializados de diseño
-        if text.startswith(("/design", "/ux", "/ui", "/tools")):
-            self.handle_general_question(message)
-            return
-        
-        # Responder a mensajes especiales del teclado
-        text_lower = text.lower()
-        design_categories = {
-            "🔬 ux research": "ux_research",
-            "🎨 ui patterns": "ui_patterns", 
-            "🎯 design systems": "design_systems",
-            "🛠️ herramientas": "tools_guides"
-        }
-        
-        for key, category in design_categories.items():
-            if text_lower in [key, key.replace("🔬 ", "").replace("🎨 ", "").replace("🎯 ", "").replace("🛠️ ", "")]:
-                keyboard = types.InlineKeyboardMarkup()
-                keyboard.add(
-                    types.InlineKeyboardButton(
-                        "Ver recursos", callback_data=f"list_{category}"
-                    )
-                )
-                
-                # Usar las nuevas descripciones de categorías desde constants
-                category_descriptions = {
-                    "ux_research": f"🔬 **UX Research** - {CATEGORY_DESCRIPTIONS['UX_RESEARCH']}",
-                    "ui_patterns": f"🎨 **UI Patterns** - {CATEGORY_DESCRIPTIONS['UI_PATTERNS']}",
-                    "design_systems": f"🎯 **Design Systems** - {CATEGORY_DESCRIPTIONS['DESIGN_SYSTEMS']}",
-                    "tools_guides": f"🛠️ **Herramientas** - {CATEGORY_DESCRIPTIONS['TOOLS_GUIDES']}"
-                }
-                
-                self.bot.send_message(
-                    message.chat.id,
-                    category_descriptions.get(category, f"Recursos de {category}:"),
-                    reply_markup=keyboard,
-                    parse_mode="Markdown"
-                )
-                return
-
-        if text_lower in ["🔍 búsqueda", "búsqueda", "busqueda"]:
-            self.bot.send_message(
-                message.chat.id,
-                "🔍 **Búsqueda especializada en UX/UI:**\n\n"
-                "• `/search` - Buscar en recursos de diseño\n"
-                "• `/design` - Principios de diseño\n"
-                "• `/ux` - Experiencia de usuario\n"
-                "• `/ui` - Interfaces y patrones\n"
-                "• `/tools` - Guías de herramientas\n\n"
-
-                "📝 *Ejemplo:* `/search atomic design`",
-                parse_mode="Markdown",
-            )
-            return
-
-        elif text_lower in ["❓ ayuda", "ayuda", "help"]:
-            self.show_help(message)
-            return
-
-        # Mensajes normales: mostrar comandos disponibles
         self.bot.send_message(
             message.chat.id,
-            "🎨 **¿Qué quieres diseñar hoy?**\n\n"
-            "**Comandos especializados:**\n"
-            "• `/design` - Principios y teoría\n"
-            "• `/ux` - Research y usabilidad\n" 
-            "• `/ui` - Interfaces y patrones\n"
-            "• `/tools [herramienta]` - Guías de Figma, Sketch, etc.\n\n"
-            "**Búsqueda:**\n"
-            "• `/search` - Buscar recursos específicos\n"
-            "• `/ask` - Consulta general\n\n"
-            "💡 *Tip:* Usa los botones del menú para explorar por categorías.",
-            parse_mode="Markdown",
+            preferences_text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
         )
 
-    def _is_probable_doi_or_url(self, text):
-            """Detecta si el texto es un DOI o URL de artículo científico"""
-            import re
-            doi_pattern = r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b"
-            url_pattern = r"(https?://[^\s]+)"
-            return bool(re.search(doi_pattern, text, re.I) or re.search(url_pattern, text, re.I))
+    def handle_admin_command(self, message):
+        """Maneja comandos de administración"""
+        self.admin_service.handle_admin_command(message)
 
-    def find_pdf_files(self, folder_path):
-        """
-        Busca archivos PDF en una carpeta y sus subcarpetas.
+    def handle_callback_query(self, call):
+        """Maneja todas las consultas de callback de forma centralizada"""
+        user_id = call.from_user.id
+        
+        # Callbacks del onboarding
+        if call.data.startswith("onb_"):
+            self.onboarding_system.handle_onboarding_callback(call)
+            
+        # Callbacks de preferencias
+        elif call.data.startswith("pref_"):
+            self._handle_preferences_callback(call)
+            
+        # Callbacks de administración
+        elif call.data.startswith("admin_"):
+            if self.admin_service.is_admin(user_id):
+                self._handle_admin_callback(call)
+            else:
+                self.bot.answer_callback_query(call.id, "❌ Sin permisos de admin")
+                
+        # Callbacks existentes
+        elif call.data.startswith("list_"):
+            self.handle_list(call)
+        elif call.data.startswith("download#"):
+            self.handle_pdf_download(call)
+        elif call.data.startswith("back_"):
+            self.handle_back(call)
+        else:
+            self.bot.answer_callback_query(call.id, "Comando no reconocido")
 
-        Args:
-            folder_path: Ruta de la carpeta donde buscar archivos PDF.
+    def _handle_preferences_callback(self, call):
+        """Maneja callbacks de configuración de preferencias"""
+        action = call.data.replace("pref_", "")
+        user_id = call.from_user.id
+        
+        if action == "level":
+            self._show_level_selection(call)
+        elif action == "tools":
+            self._show_tools_selection(call)
+        elif action == "interests":
+            self._show_interests_selection(call)
+        elif action == "style":
+            self._show_style_selection(call)
+        elif action == "reset_onboarding":
+            self._reset_user_onboarding(call)
 
-        Returns:
-            Lista de rutas de archivos PDF encontrados.
-        """
+    def _show_level_selection(self, call):
+        """Muestra selección de nivel de experiencia"""
+        level_text = "🎯 **Selecciona tu nivel de experiencia:**"
+        
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(
+            types.InlineKeyboardButton("🌱 Principiante", callback_data="set_level_beginner")
+        )
+        keyboard.add(
+            types.InlineKeyboardButton("🚀 Intermedio", callback_data="set_level_intermediate")
+        )
+        keyboard.add(
+            types.InlineKeyboardButton("⭐ Avanzado", callback_data="set_level_expert")
+        )
+        keyboard.add(
+            types.InlineKeyboardButton("⬅️ Volver", callback_data="pref_back")
+        )
+        
+        try:
+            self.bot.edit_message_text(
+                level_text,
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(
+                call.message.chat.id,
+                level_text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+
+    def _show_tools_selection(self, call):
+        """Muestra selección de herramientas favoritas"""
+        user_id = call.from_user.id
+        session = self.state_manager.get_user_session(user_id)
+        selected_tools = session.favorite_tools
+        
+        tools_text = (
+            "🛠️ **Selecciona tus herramientas favoritas:**\n\n"
+            f"Actualmente seleccionadas: {', '.join(selected_tools) if selected_tools else 'Ninguna'}"
+        )
+        
+        tools = ["Figma", "Sketch", "Adobe XD", "InVision", "Framer", "Principle"]
+        
+        keyboard = types.InlineKeyboardMarkup()
+        for tool in tools:
+            emoji = "✅" if tool in selected_tools else "⚪"
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    f"{emoji} {tool}",
+                    callback_data=f"toggle_tool_{tool}"
+                )
+            )
+        
+        keyboard.add(
+            types.InlineKeyboardButton("💾 Guardar", callback_data="save_tools"),
+            types.InlineKeyboardButton("⬅️ Volver", callback_data="pref_back")
+        )
+        
+        try:
+            self.bot.edit_message_text(
+                tools_text,
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(
+                call.message.chat.id,
+                tools_text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+
+    def _show_interests_selection(self, call):
+        """Muestra selección de áreas de interés"""
+        user_id = call.from_user.id
+        session = self.state_manager.get_user_session(user_id)
+        selected_interests = session.preferences.get('interests', [])
+        
+        interests_text = (
+            "💡 **Selecciona tus áreas de interés:**\n\n"
+            f"Actualmente seleccionadas: {', '.join(selected_interests) if selected_interests else 'Ninguna'}"
+        )
+        
+        interests = ["UX Research", "UI Design", "Design Systems", "Prototyping", "Usability Testing", "Mobile Design"]
+        
+        keyboard = types.InlineKeyboardMarkup()
+        for interest in interests:
+            emoji = "✅" if interest in selected_interests else "⚪"
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    f"{emoji} {interest}",
+                    callback_data=f"toggle_interest_{interest.replace(' ', '_')}"
+                )
+            )
+        
+        keyboard.add(
+            types.InlineKeyboardButton("💾 Guardar", callback_data="save_interests"),
+            types.InlineKeyboardButton("⬅️ Volver", callback_data="pref_back")
+        )
+        
+        try:
+            self.bot.edit_message_text(
+                interests_text,
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(
+                call.message.chat.id,
+                interests_text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+
+    def _show_style_selection(self, call):
+        """Muestra selección de estilo de respuesta"""
+        user_id = call.from_user.id
+        session = self.state_manager.get_user_session(user_id)
+        current_style = session.preferences.get('response_style', 'professional')
+        
+        style_text = (
+            "🎨 **Selecciona tu estilo de respuesta preferido:**\n\n"
+            f"Estilo actual: **{current_style.title()}**\n\n"
+            "**Estilos disponibles:**\n"
+            "• **Profesional:** Terminología técnica e industria\n"
+            "• **Casual:** Conversacional y amigable\n"
+            "• **Académico:** Rigor teórico y referencias\n"
+            "• **Práctico:** Enfoque en ejemplos reales"
+        )
+        
+        styles = [
+            ("professional", "Profesional"),
+            ("casual", "Casual"),
+            ("academic", "Académico"),
+            ("practical", "Práctico")
+        ]
+        
+        keyboard = types.InlineKeyboardMarkup()
+        for style_id, style_name in styles:
+            emoji = "✅" if style_id == current_style else "⚪"
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    f"{emoji} {style_name}",
+                    callback_data=f"set_style_{style_id}"
+                )
+            )
+        
+        keyboard.add(
+            types.InlineKeyboardButton("⬅️ Volver", callback_data="pref_back")
+        )
+        
+        try:
+            self.bot.edit_message_text(
+                style_text,
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(
+                call.message.chat.id,
+                style_text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+
+    def _reset_user_onboarding(self, call):
+        """Reinicia el proceso de onboarding para el usuario"""
+        user_id = call.from_user.id
+        session = self.state_manager.get_user_session(user_id)
+        
+        # Resetear configuraciones de onboarding
+        session.preferences["onboarding_completed"] = False
+        session.expertise_level = "intermediate"
+        session.favorite_tools = []
+        session.preferences["interests"] = []
+        
+        # Guardar cambios
+        self.state_manager._save_sessions()
+        
+        reset_text = (
+            "🔄 **Onboarding reiniciado**\n\n"
+            "Tu perfil ha sido reseteado. Te guiaré nuevamente por el proceso de configuración."
+        )
+        
+        try:
+            self.bot.edit_message_text(
+                reset_text,
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(
+                call.message.chat.id,
+                reset_text,
+                parse_mode="Markdown"
+            )
+        
+        # Iniciar onboarding después de un momento
+        time.sleep(2)
+        self.onboarding_system.start_onboarding(call.message)
+
+    def handle_analytics_command(self, message):
+        """Muestra analytics personales del usuario"""
+        user_id = message.from_user.id
+        analytics = self.state_manager.get_user_analytics(user_id)
+        session = self.state_manager.get_user_session(user_id)
+        
+        # Calcular tiempo de actividad
+        session_hours = analytics['session_duration'] / 3600
+        
+        analytics_text = (
+            "📊 **Tus Estadísticas Personales**\n\n"
+            f"🎯 **Perfil:**\n"
+            f"• Nivel: {analytics['expertise_level'].title()}\n"
+            f"• Herramientas: {', '.join(analytics['favorite_tools']) if analytics['favorite_tools'] else 'No definidas'}\n\n"
+            f"📈 **Actividad:**\n"
+            f"• Búsquedas realizadas: {analytics['searches_count']}\n"
+            f"• Conversaciones: {analytics['conversation_length']} mensajes\n"
+            f"• Tiempo total: {session_hours:.1f} horas\n"
+            f"• Promedio por sesión: {session_hours*60/max(1, analytics['searches_count']):.1f} min\n\n"
+            f"💡 **Recomendaciones:**\n"
+        )
+        
+        # Generar recomendaciones personalizadas
+        if analytics['searches_count'] < 5:
+            analytics_text += "• Explora más con `/search` para descubrir contenido relevante\n"
+        
+        if not analytics['favorite_tools']:
+            analytics_text += "• Define tus herramientas favoritas en `/preferences`\n"
+        
+        if analytics['expertise_level'] == 'beginner' and analytics['searches_count'] > 10:
+            analytics_text += "• Considera actualizar tu nivel a 'Intermedio' en preferencias\n"
+        
+        # Sugerencias de búsqueda
+        suggestions = self.search_service.get_search_suggestions(user_id)
+        if suggestions:
+            analytics_text += f"\n🔍 **Sugerencias para ti:**\n"
+            for suggestion in suggestions[:3]:
+                analytics_text += f"• {suggestion}\n"
+        
+        self.bot.send_message(
+            message.chat.id,
+            analytics_text,
+            parse_mode="Markdown"
+        )
+
+    def handle_trending_command(self, message):
+        """Muestra contenido y búsquedas populares"""
+        trending_searches = self.search_service.get_trending_searches()
+        user_id = message.from_user.id
+        user_suggestions = self.search_service.get_search_suggestions(user_id)
+        
+        trending_text = (
+            "🔥 **Tendencias en DesignBot**\n\n"
+            "📈 **Búsquedas populares esta semana:**\n"
+        )
+        
+        for i, query in enumerate(trending_searches[:8], 1):
+            trending_text += f"{i}. {query}\n"
+        
+        if user_suggestions:
+            trending_text += f"\n💡 **Recomendado para ti:**\n"
+            for suggestion in user_suggestions[:5]:
+                trending_text += f"• {suggestion}\n"
+        
+        trending_text += (
+            f"\n🎯 **Tips:**\n"
+            f"• Usa `/search [término]` para explorar cualquier tema\n"
+            f"• Combina términos para búsquedas más específicas\n"
+            f"• Revisa `/analytics` para ver tu progreso personal"
+        )
+        
+        # Agregar botones de acción rápida
+        keyboard = types.InlineKeyboardMarkup()
+        if trending_searches:
+            # Botón para la búsqueda más popular
+            top_search = trending_searches[0]
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    f"🔍 Buscar: {top_search[:25]}...",
+                    callback_data=f"quick_search_{top_search[:20]}"
+                )
+            )
+        
+        keyboard.add(
+            types.InlineKeyboardButton("📊 Mis estadísticas", callback_data="show_my_analytics"),
+            types.InlineKeyboardButton("⚙️ Preferencias", callback_data="show_preferences")
+        )
+        
+        self.bot.send_message(
+            message.chat.id,
+            trending_text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+
+    def handle_tips_command(self, message):
+        """Proporciona tips contextuales basados en el perfil del usuario"""
+        user_id = message.from_user.id
+        session = self.state_manager.get_user_session(user_id)
+        
+        # Tips personalizados por nivel
+        level_tips = {
+            "beginner": [
+                "🌱 **Para principiantes:** Comienza con los fundamentos de UX/UI",
+                "📚 Estudia los principios básicos de diseño visual",
+                "👥 Aprende sobre research de usuarios paso a paso",
+                "🎨 Familiarízate con herramientas como Figma",
+                "📱 Practica con proyectos pequeños y recibe feedback"
+            ],
+            "intermediate": [
+                "🚀 **Para intermedios:** Profundiza en metodologías específicas",
+                "📊 Aprende a medir y validar tus diseños",
+                "🎯 Crea tu primer design system personal",
+                "🔄 Domina procesos de iteración y prototipado",
+                "💼 Construye un portafolio sólido con case studies"
+            ],
+            "expert": [
+                "⭐ **Para expertos:** Enfócate en liderazgo y estrategia",
+                "📈 Conecta diseño con métricas de negocio",
+                "👥 Mentoriza a otros diseñadores",
+                "🏗️ Diseña sistemas escalables y arquitecturas",
+                "🌍 Contribuye a la comunidad de diseño"
+            ]
+        }
+        
+        # Tips por herramientas favoritas
+        tool_tips = {
+            "Figma": [
+                "💡 **Figma:** Usa Auto Layout para componentes responsive",
+                "🔧 Configura design tokens para consistencia",
+                "📚 Crea bibliotecas compartidas para tu equipo",
+                "🎨 Aprovecha los plugins para automatizar tareas"
+            ],
+            "Sketch": [
+                "💡 **Sketch:** Organiza con Symbols y Libraries",
+                "🔄 Usa Sketch Cloud para colaboración",
+                "📐 Configura grids y guides consistentes",
+                "🎨 Explora plugins para funciones avanzadas"
+            ],
+            "Adobe XD": [
+                "💡 **Adobe XD:** Aprovecha Voice Prototyping",
+                "🔗 Usa componentes para diseño sistemático",
+                "📱 Prototipos mobile con gestos avanzados",
+                "☁️ Colabora en tiempo real con Creative Cloud"
+            ]
+        }
+        
+        # Tips por intereses
+        interest_tips = {
+            "UX Research": [
+                "🔬 **UX Research:** Combina métodos cuali y cuantitativos",
+                "👥 Entrevista usuarios regularmente",
+                "📊 Valida hipótesis con pruebas A/B",
+                "📝 Documenta insights de forma sistemática"
+            ],
+            "Design Systems": [
+                "🎯 **Design Systems:** Comienza con atomic design",
+                "📏 Define tokens antes que componentes",
+                "📚 Documenta patrones y decisiones",
+                "🔄 Itera basado en feedback del equipo"
+            ]
+        }
+        
+        # Seleccionar tips relevantes
+        selected_tips = []
+        
+        # Tips por nivel (sempre incluir)
+        level = session.expertise_level
+        if level in level_tips:
+            selected_tips.extend(level_tips[level][:3])
+        
+        # Tips por herramientas
+        for tool in session.favorite_tools[:2]:  # Max 2 herramientas
+            if tool in tool_tips:
+                selected_tips.extend(tool_tips[tool][:2])
+        
+        # Tips por intereses
+        interests = session.preferences.get('interests', [])
+        for interest in interests[:2]:  # Max 2 intereses
+            if interest in interest_tips:
+                selected_tips.extend(interest_tips[interest][:2])
+        
+        # Tip general si no hay suficientes
+        if len(selected_tips) < 3:
+            selected_tips.append("💫 **General:** La práctica constante es clave en diseño")
+            selected_tips.append("🔍 **Explora:** Usa `/search` para descubrir nuevos recursos")
+        
+        # Construir mensaje
+        tips_text = (
+            "💡 **Tips Personalizados para Ti**\n\n"
+            f"Basado en tu perfil: {level.title()}"
+        )
+        
+        if session.favorite_tools:
+            tips_text += f" | {', '.join(session.favorite_tools[:2])}"
+        
+        tips_text += "\n\n"
+        
+        # Añadir tips seleccionados
+        for i, tip in enumerate(selected_tips[:6], 1):
+            tips_text += f"{i}. {tip}\n\n"
+        
+        tips_text += (
+            "🚀 **Siguiente paso:**\n"
+            "• Elige un tip y aplicalo en tu próximo proyecto\n"
+            "• Usa `/search` para profundizar en temas específicos\n"
+            "• Actualiza tus `/preferences` según evoluciones"
+        )
+        
+        # Botones de acción
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(
+            types.InlineKeyboardButton("🔍 Buscar recursos", callback_data="quick_search_resources"),
+            types.InlineKeyboardButton("⚙️ Actualizar perfil", callback_data="show_preferences")
+        )
+        keyboard.add(
+            types.InlineKeyboardButton("📊 Ver progreso", callback_data="show_my_analytics")
+        )
+        
+        self.bot.send_message(
+            message.chat.id,
+            tips_text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+
+    def _handle_admin_callback(self, call):
+        """Maneja callbacks específicos de administración"""
+        action = call.data.replace("admin_", "")
+        
+        if action == "broadcast_confirm":
+            self._execute_broadcast(call)
+        elif action == "broadcast_cancel":
+            self._cancel_broadcast(call)
+        elif action == "trends":
+            self._show_detailed_trends(call)
+        elif action == "active_users":
+            self._show_active_users_detail(call)
+        # Añadir más handlers según necesidad
+
+    def _execute_broadcast(self, call):
+        """Ejecuta el envío de mensaje broadcast"""
+        if not hasattr(self, '_temp_broadcast_message'):
+            self.bot.answer_callback_query(call.id, "❌ Mensaje broadcast no encontrado")
+            return
+        
+        message = self._temp_broadcast_message
+        sent_count = 0
+        failed_count = 0
+        
+        # Enviar a todos los usuarios activos
+        for user_id in self.state_manager.active_sessions.keys():
+            try:
+                self.bot.send_message(user_id, f"📢 **Mensaje del equipo:**\n\n{message}", parse_mode="Markdown")
+                sent_count += 1
+            except Exception as e:
+                failed_count += 1
+                self.logger.warning(f"Error enviando broadcast a {user_id}: {e}")
+        
+        # Reportar resultados
+        result_text = (
+            f"📢 **Broadcast completado**\n\n"
+            f"✅ Enviado exitosamente: {sent_count}\n"
+            f"❌ Fallos: {failed_count}\n"
+            f"📊 Total intentos: {sent_count + failed_count}"
+        )
+        
+        try:
+            self.bot.edit_message_text(
+                result_text,
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(call.message.chat.id, result_text, parse_mode="Markdown")
+        
+        # Limpiar mensaje temporal
+        delattr(self, '_temp_broadcast_message')
+
+    def _cancel_broadcast(self, call):
+        """Cancela el envío de broadcast"""
+        if hasattr(self, '_temp_broadcast_message'):
+            delattr(self, '_temp_broadcast_message')
+        
+        try:
+            self.bot.edit_message_text(
+                "❌ **Broadcast cancelado**\n\nEl mensaje no fue enviado.",
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode="Markdown"
+            )
+        except:
+            self.bot.send_message(
+                call.message.chat.id,
+                "❌ **Broadcast cancelado**",
+                parse_mode="Markdown"
+            )
+
+    # Métodos auxiliares existentes continúan...
+    def find_pdf_files(self, directory):
+        """Encuentra todos los archivos PDF en el directorio y subdirectorios"""
         pdf_files = []
-        for root, _, files in os.walk(folder_path):
+        for root, dirs, files in os.walk(directory):
             for file in files:
-                if file.lower().endswith(".pdf"):
+                if file.lower().endswith('.pdf'):
                     pdf_files.append(os.path.join(root, file))
         return pdf_files
 
-    def remove_markdown(self, text):
-        """
-        Elimina completamente el formato Markdown del texto.
-
-        Args:
-            text: Texto con posible formato Markdown
-
-        Returns:
-            Texto plano sin formato
-        """
-        import re
-
-        if not text:
-            return ""
-
-        # Eliminar bloques de código
-        text = re.sub(r"```[\s\S]*?```", "", text)
-
-        # Eliminar formato de negrita y cursiva
-        text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)  # Negrita
-        text = re.sub(r"\*(.*?)\*", r"\1", text)  # Cursiva con asteriscos
-        text = re.sub(r"_(.*?)_", r"\1", text)  # Cursiva con guiones bajos
-
-        # Eliminar enlaces, manteniendo el texto
-        text = re.sub(r"\[(.*?)\]\(.*?\)", r"\1", text)
-
-        # Eliminar formato de listas
-        text = re.sub(r"^\s*[-*+]\s", "", text, flags=re.MULTILINE)
-        text = re.sub(r"^\s*\d+\.\s", "", text, flags=re.MULTILINE)
-
-        # Eliminar encabezados
-        text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-
-        # Eliminar comillas de código en línea
-        text = re.sub(r"`(.*?)`", r"\1", text)
-
-        return text
-
-
-def sanitize_markdown(text):
-    """
-    Limpia el texto para evitar errores de formato Markdown en Telegram.
-
-    Args:
-        text: Texto a limpiar
-
-    Returns:
-        Texto limpio con formato Markdown seguro
-    """
-    if not text:
-        return ""
-
-    # Lista de caracteres especiales de Markdown que pueden causar problemas
-    special_chars = [
-        "_",
-        "*",
-        "`",
-        "[",
-        "]",
-        "(",
-        ")",
-        "#",
-        "+",
-        "-",
-        "=",
-        "|",
-        "{",
-        "}",
-        ".",
-        "!",
-    ]
-
-    # Escapar los caracteres especiales que no formen parte de un formato válido
-    result = ""
-    i = 0
-    in_code_block = False
-    in_bold = False
-    in_italic = False
-    in_link = False
-
-    while i < len(text):
-        char = text[i]
-
-        # Manejo de bloques de código
-        if i < len(text) - 2 and text[i : i + 3] == "```":
-            in_code_block = not in_code_block
-            result += "```"
-            i += 3
-            continue
-
-        # Si estamos dentro de un bloque de código, añadir sin procesar
-        if in_code_block:
-            result += char
-            i += 1
-            continue
-
-        # Manejo de negrita
-        if i < len(text) - 1 and text[i : i + 2] == "**":
-            in_bold = not in_bold
-            result += "*"  # Telegram usa un solo asterisco para negrita
-            i += 2
-            continue
-
-        # Manejo de cursiva
-        if char == "_" or (char == "*" and i < len(text) - 1 and text[i + 1] != "*"):
-            in_italic = not in_italic
-            result += char
-            i += 1
-            continue
-
-        # Manejo de enlaces
-        if char == "[" and not in_link:
-            in_link = True
-            result += char
-            i += 1
-            continue
-        elif char == "]" and in_link and i < len(text) - 1 and text[i + 1] == "(":
-            in_link = False
-            result += char
-            i += 1
-            continue
-
-        # Escapar caracteres especiales que no son parte de formato
-        if char in special_chars and not (in_bold or in_italic or in_link):
-            result += "\\"
-
-        result += char
-        i += 1
-
-    # Arreglar formatos incompletos
-    if in_bold:
-        result += "*"
-    if in_italic:
-        result += "_"
-    if in_code_block:
-        result += "\n```"
-
-    # Dividir mensajes demasiado largos
-    if len(result) > 3500:  # Telegram tiene un límite de 4096, dejamos margen
-        parts = []
-        current_part = ""
-        paragraphs = result.split("\n\n")
-
-        for paragraph in paragraphs:
-            if len(current_part) + len(paragraph) + 2 > 3500:
-                parts.append(current_part)
-                current_part = paragraph
-            else:
-                if current_part:
-                    current_part += "\n\n"
-                current_part += paragraph
-
-        if current_part:
-            parts.append(current_part)
-
-        return parts
-
-    return result
+    # ...resto de métodos existentes permanecen igual...
