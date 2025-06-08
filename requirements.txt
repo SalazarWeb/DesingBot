@@ -9,3 +9,5 @@ pillow
 langchain
 scikit-learn
 pyPDF2
+urllib3
+requests[security]

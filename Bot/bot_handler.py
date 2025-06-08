@@ -151,13 +151,13 @@ class BotHandler:
             "general": "💭 Procesando tu consulta de diseño..."
         }
         
-        self.bot.send_chat_action(message.chat.id, "typing")
-        self.bot.send_message(
-            message.chat.id, 
-            context_messages.get(command_type, context_messages["general"])
-        )
-
         try:
+            self.bot.send_chat_action(message.chat.id, "typing")
+            status_msg = self.bot.send_message(
+                message.chat.id, 
+                context_messages.get(command_type, context_messages["general"])
+            )
+
             # Contextualizar la pregunta según el comando
             if command_type != "general":
                 context_prefixes = {
@@ -168,8 +168,16 @@ class BotHandler:
                 }
                 question = context_prefixes[command_type] + question
             
-            self.logger.info(f"Generando respuesta de {command_type} para: {question[:50]}...")
+            self.logger.info(f"Generando respuesta de {command_type} para usuario {user_id}: {question[:50]}...")
+            
+            # Llamar a la IA con manejo robusto
             respuesta = answer_general_question(question)
+
+            # Eliminar mensaje de estado
+            try:
+                self.bot.delete_message(message.chat.id, status_msg.message_id)
+            except:
+                pass  # No importa si no se puede eliminar
 
             safe_response = sanitize_markdown(respuesta)
 
@@ -182,17 +190,27 @@ class BotHandler:
                 )
 
         except Exception as e:
-            self.logger.error(f"Error en handle_general_question: {str(e)}")
-            self.bot.send_message(
-                message.chat.id,
-                "❌ No pude generar una respuesta. Por favor, intenta reformular tu pregunta de diseño.",
-            )
+            self.logger.error(f"Error en handle_general_question para usuario {user_id}: {str(e)}")
+            # Eliminar mensaje de estado si existe
+            try:
+                self.bot.delete_message(message.chat.id, status_msg.message_id)
+            except:
+                pass
+            
+            # Mensaje de error más específico
+            error_msg = "❌ No pude generar una respuesta en este momento."
+            if "timeout" in str(e).lower() or "connection" in str(e).lower():
+                error_msg += "\n\n⏱️ El servicio está experimentando alta demanda. Por favor, intenta nuevamente en unos momentos."
+            else:
+                error_msg += "\n\n💡 Intenta reformular tu pregunta de diseño o usar `/help` para ver otros comandos."
+            
+            self.bot.send_message(message.chat.id, error_msg)
         finally:
             elapsed = time.perf_counter() - start_time
             self.logger.info(
-                f"Tiempo de respuesta de handle_general_question: {elapsed:.3f} segundos"
+                f"Tiempo de respuesta de handle_general_question para usuario {user_id}: {elapsed:.3f} segundos"
             )
-            self.processing_users.remove(user_id)
+            self.processing_users.discard(user_id)  # Usar discard para evitar KeyError
 
     def handle_embedding_search(self, message):
         """Busca documentos relevantes y genera respuesta basada en ellos"""
@@ -213,13 +231,24 @@ class BotHandler:
             return
 
         self.processing_users.add(user_id)
-        self.bot.send_chat_action(message.chat.id, "typing")
-
+        
+        # Mensajes de estado mejorados
+        status_msg = None
         try:
-            self.logger.info(f"Buscando documentos para: {question[:50]}...")
+            self.bot.send_chat_action(message.chat.id, "typing")
+            status_msg = self.bot.send_message(
+                message.chat.id,
+                "🔍 Buscando en recursos de diseño..."
+            )
+
+            self.logger.info(f"Buscando documentos para usuario {user_id}: {question[:50]}...")
 
             # Verificación de datos disponibles
             if not self.index_model or not self.chunks:
+                try:
+                    self.bot.delete_message(message.chat.id, status_msg.message_id)
+                except:
+                    pass
                 self.bot.send_message(
                     message.chat.id,
                     "⚠️ No hay documentos procesados disponibles para búsqueda.",
@@ -229,6 +258,10 @@ class BotHandler:
             # Generación de embedding para la búsqueda
             question_embedding = embed_question(question)
             if not question_embedding:
+                try:
+                    self.bot.delete_message(message.chat.id, status_msg.message_id)
+                except:
+                    pass
                 self.bot.send_message(
                     message.chat.id,
                     "❌ No pude procesar tu consulta. Intenta con otra pregunta.",
@@ -241,34 +274,48 @@ class BotHandler:
             )
 
             if not similar_chunks:
+                try:
+                    self.bot.delete_message(message.chat.id, status_msg.message_id)
+                except:
+                    pass
                 self.bot.send_message(
                     message.chat.id,
                     "❓ No encontré documentos relacionados con tu consulta.",
                 )
                 return
 
-            # Indicar al usuario que estamos generando la respuesta
-            self.bot.send_message(
-                message.chat.id,
-                "⏳ Generando respuesta basada en los documentos relevantes...",
-            )
+            # Actualizar mensaje de estado
+            try:
+                self.bot.edit_message_text(
+                    "📚 Generando respuesta basada en documentos relevantes...",
+                    message.chat.id,
+                    status_msg.message_id
+                )
+            except:
+                pass
 
             # Generar respuesta usando los chunks encontrados
             from ai_embedding.ai import generate_answer
 
             answer, references = generate_answer(question, similar_chunks, self.chunks)
 
+            # Eliminar mensaje de estado
+            try:
+                self.bot.delete_message(message.chat.id, status_msg.message_id)
+            except:
+                pass
+
             # Enviar la respuesta principal (dividida si es necesaria)
-            if len(answer) > 4000:  # Cambiado de plain_answer a answer
+            if len(answer) > 4000:
                 chunks = [answer[i : i + 4000] for i in range(0, len(answer), 4000)]
                 for chunk in chunks:
-                    self.bot.send_message(message.chat.id, chunk)
+                    self.bot.send_message(message.chat.id, chunk, parse_mode="Markdown")
             else:
                 self.bot.send_message(
-                    message.chat.id, answer
-                )  # Cambiado de plain_answer a answer
+                    message.chat.id, answer, parse_mode="Markdown"
+                )
 
-            # NUEVA IMPLEMENTACIÓN: Manejo mejorado de referencias
+            # Manejo mejorado de referencias
             if similar_chunks:
                 # Diccionario para agrupar referencias por documento
                 doc_refs = {}  # {documento: set(páginas)}
@@ -312,7 +359,6 @@ class BotHandler:
 
                     for doc_pretty_name in doc_refs.keys():
                         # Buscar documento en sistema de archivos
-                        found = False
                         for pdf_path in self.find_pdf_files(DOCUMENTS_FOLDER):
                             base_name = os.path.basename(pdf_path)
                             pdf_pretty_name = base_name.replace(".pdf", "").replace(
@@ -328,7 +374,6 @@ class BotHandler:
                                         callback_data=f"download#{rel_path}",
                                     )
                                 )
-                                found = True
                                 break
 
                     # Enviar botones solo si hay documentos para descargar
@@ -340,14 +385,29 @@ class BotHandler:
                         )
 
         except Exception as e:
-            self.logger.error(f"Error en handle_embedding_search: {str(e)}")
-            self.bot.send_message(message.chat.id, "❌ Error al procesar tu búsqueda.")
+            self.logger.error(f"Error en handle_embedding_search para usuario {user_id}: {str(e)}")
+            
+            # Eliminar mensaje de estado si existe
+            if status_msg:
+                try:
+                    self.bot.delete_message(message.chat.id, status_msg.message_id)
+                except:
+                    pass
+            
+            # Mensaje de error específico
+            error_msg = "❌ Error al procesar tu búsqueda."
+            if "timeout" in str(e).lower() or "connection" in str(e).lower():
+                error_msg += "\n\n⏱️ El servicio está experimentando alta demanda. Por favor, intenta nuevamente en unos momentos."
+            else:
+                error_msg += "\n\n💡 Intenta reformular tu consulta o usar `/help` para ver otros comandos."
+            
+            self.bot.send_message(message.chat.id, error_msg)
         finally:
             elapsed = time.perf_counter() - start_time
             self.logger.info(
-                f"Tiempo de respuesta de handle_embedding_search: {elapsed:.3f} segundos"
+                f"Tiempo de respuesta de handle_embedding_search para usuario {user_id}: {elapsed:.3f} segundos"
             )
-            self.processing_users.remove(user_id)
+            self.processing_users.discard(user_id)  # Usar discard para evitar KeyError
 
     def show_help(self, message_or_call):
         """Muestra ayuda del bot UX/UI"""
