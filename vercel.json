@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "api/webhook.py": {
+      "runtime": "python3.9"
+    }
+  },
+  "env": {
+    "TOKEN": "@token"
+  },
+  "regions": ["iad1"],
+  "rewrites": [
+    {
+      "source": "/webhook",
+      "destination": "/api/webhook"
+    }
+  ]
+}

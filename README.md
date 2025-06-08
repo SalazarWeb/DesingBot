@@ -1,63 +1,66 @@
-# DesignBot - Tu Mentor Personal de Diseño 🎨✨
+# 🎨 DesignBot - Bot de Telegram para UX/UI
 
-Bot especializado en UX/UI Design que utiliza **embeddings vectoriales** e **IA avanzada** para proporcionar asesoría profesional, recursos especializados y mejores prácticas de diseño digital.
+Bot inteligente de Telegram especializado en consultas de diseño UX/UI, con base de conocimientos integrada y capacidades de IA.
 
-## 🚀 Inicio Rápido
+## 🚀 Despliegue en Railway.app (24/7)
 
-```bash
-# 1. Clonar el repositorio
-git clone <este-repositorio>
-cd DesignBot
+### Paso 1: Preparar el repositorio
 
-# 2. Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus API keys
+1. **Crear repositorio en GitHub:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit: DesignBot"
+   git branch -M main
+   git remote add origin https://github.com/TU_USUARIO/designbot.git
+   git push -u origin main
+   ```
 
-# 3. Ejecutar script de inicio
-./start_bot.sh
+### Paso 2: Configurar Railway
+
+1. **Ir a [Railway.app](https://railway.app)**
+2. **Conectar con GitHub**
+3. **Seleccionar "Deploy from GitHub repo"**
+4. **Elegir tu repositorio `designbot`**
+
+### Paso 3: Configurar Variables de Entorno
+
+En Railway, ir a **Variables** y agregar:
+```
+TOKEN=tu_token_de_botfather_aqui
 ```
 
-## 🎯 Características Principales
+### Paso 4: Deploy Automático
 
-### 🧠 **Comandos Especializados**
-| Comando | Descripción | Ejemplo |
-|---------|-------------|---------|
-| `/design [consulta]` | Principios y teoría del diseño | `/design jerarquía visual` |
-| `/ux [consulta]` | Research y experiencia de usuario | `/ux user personas` |
-| `/ui [consulta]` | Interfaces y componentes | `/ui botones accesibles` |
-| `/tools [herramienta]` | Guías de herramientas | `/tools Figma components` |
+Railway detectará automáticamente:
+- ✅ `requirements.txt` (dependencias Python)
+- ✅ `Procfile` (comando de inicio)
+- ✅ `railway.toml` (configuración)
 
-### 🔍 **Búsqueda Inteligente**
-- **`/search [tema]`** - Búsqueda semántica en recursos especializados
-- **`/ask [pregunta]`** - Consultas generales con IA experta
+## 🛠️ Comandos Disponibles
 
-### 📚 **Biblioteca Organizada**
-- **🎨 UX Research** - Metodologías, personas, journey mapping
-- **🖼️ UI Patterns** - Componentes, tokens, responsive design
-- **🎯 Design Systems** - Atomic design, style guides
-- **📱 Case Studies** - Casos reales, redesigns famosos
-- **🛠️ Herramientas** - Figma, Sketch, Adobe XD
-- **♿ Accesibilidad** - WCAG, diseño inclusivo
+- `/start` - Iniciar el bot
+- `/design` - Consultas generales de diseño
+- `/ux` - Preguntas específicas sobre UX
+- `/ui` - Preguntas específicas sobre UI
+- `/tools` - Información sobre herramientas
+- `/search` - Buscar en base de conocimientos
+- `/help` - Mostrar ayuda completa
 
-## 🛠️ Tecnología
+## 🏠 Ejecución Local
 
-- **🤖 Fireworks AI** - LLM especializado en UX/UI
-- **🔍 Embeddings vectoriales** - Búsqueda semántica avanzada
-- **📄 Procesamiento PDF** - Extracción inteligente de contenido
-- **⚡ Índice sklearn** - Búsquedas ultrarrápidas
-- **📱 Telegram Bot API** - Interfaz conversacional
-
-## ⚙️ Configuración Detallada
-
-### 📋 **Requisitos**
+### Requisitos
 - Python 3.8+
-- Token de Telegram Bot (@BotFather)
-- API Key de Fireworks AI
+- Token de bot de Telegram (@BotFather)
 
-### 🔧 **Instalación Manual**
+### Instalación
 ```bash
+# Clonar repositorio
+git clone https://github.com/TU_USUARIO/designbot.git
+cd designbot
+
 # Crear entorno virtual
-python3 -m venv venv
+python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # o
 venv\Scripts\activate     # Windows
@@ -65,17 +68,14 @@ venv\Scripts\activate     # Windows
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con tus credenciales
+# Configurar token
+echo "TOKEN=tu_token_aqui" > .env
 
 # Ejecutar bot
-cd Bot && python main.py
+python Bot/main.py
 ```
 
-### 🔑 **Variables de Entorno (.env)**
-```bash
-TOKEN=tu_token_telegram          # De @BotFather
+### Ejecución en Segundo Plano
 FIRE=tu_api_key_fireworks       # De Fireworks AI
 BOT_NAME=DesignBot              # Nombre del bot
 LOG_LEVEL=INFO                  # DEBUG, INFO, WARNING

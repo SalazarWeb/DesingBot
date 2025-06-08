@@ -1,4 +1,5 @@
-pyTelegramBotAPI
+pyTelegramBotAPI==4.27.0
+flask==2.3.3
 pymupdf
 requests
 python-dotenv
