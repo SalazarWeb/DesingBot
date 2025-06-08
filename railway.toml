@@ -1,9 +1,0 @@
-[build]
-builder = "nixpacks"
-
-[deploy]
-startCommand = "python Bot/main.py"
-restartPolicyType = "always"
-
-[environments.production.variables]
-PYTHONPATH = "/app"

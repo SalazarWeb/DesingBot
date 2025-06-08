@@ -2,7 +2,7 @@
 
 Bot inteligente de Telegram especializado en consultas de diseño UX/UI, con base de conocimientos integrada y capacidades de IA.
 
-## 🚀 Despliegue en Railway.app (24/7)
+## 🚀 Despliegue en Vercel (24/7)
 
 ### Paso 1: Preparar el repositorio
 
@@ -12,30 +12,35 @@ Bot inteligente de Telegram especializado en consultas de diseño UX/UI, con bas
    git add .
    git commit -m "Initial commit: DesignBot"
    git branch -M main
-   git remote add origin https://github.com/TU_USUARIO/designbot.git
+   git remote add origin https://github.com/SalazarWeb/designbot.git
    git push -u origin main
    ```
 
-### Paso 2: Configurar Railway
+### Paso 2: Configurar Vercel
 
-1. **Ir a [Railway.app](https://railway.app)**
+1. **Ir a [Vercel.com](https://vercel.com)**
 2. **Conectar con GitHub**
-3. **Seleccionar "Deploy from GitHub repo"**
-4. **Elegir tu repositorio `designbot`**
+3. **Importar repositorio `designbot`**
+4. **Configurar como aplicación de funciones serverless**
 
 ### Paso 3: Configurar Variables de Entorno
 
-En Railway, ir a **Variables** y agregar:
+En Vercel, ir a **Settings → Environment Variables** y agregar:
 ```
 TOKEN=tu_token_de_botfather_aqui
+FIRE=tu_api_key_fireworks
+BOT_NAME=DesignBot
+LOG_LEVEL=INFO
 ```
 
-### Paso 4: Deploy Automático
+### Paso 4: Deploy Automático con Webhook
 
-Railway detectará automáticamente:
+Vercel detectará automáticamente:
+- ✅ `vercel.json` (configuración de funciones)
+- ✅ `api/webhook.py` (endpoint de webhook)
 - ✅ `requirements.txt` (dependencias Python)
-- ✅ `Procfile` (comando de inicio)
-- ✅ `railway.toml` (configuración)
+
+El bot funcionará a través de webhooks, procesando mensajes de forma serverless.
 
 ## 🛠️ Comandos Disponibles
 
@@ -56,7 +61,7 @@ Railway detectará automáticamente:
 ### Instalación
 ```bash
 # Clonar repositorio
-git clone https://github.com/TU_USUARIO/designbot.git
+git clone https://github.com/SalazarWeb/designbot.git
 cd designbot
 
 # Crear entorno virtual
@@ -77,7 +82,7 @@ python Bot/main.py
 
 ### Ejecución en Segundo Plano
 FIRE=tu_api_key_fireworks       # De Fireworks AI
-BOT_NAME=DesignBot              # Nombre del bot
+BOT_NAME=DesignBot              # DesingBot
 LOG_LEVEL=INFO                  # DEBUG, INFO, WARNING
 ```
 
@@ -239,4 +244,4 @@ tail -f Bot/logs/data.log
 
 **🎨 Transformando ideas en experiencias excepcionales, un diseño a la vez.**
 
-*Desarrollado con ❤️ para la comunidad de UX/UI Design*
+*Desarrollado para la comunidad de UX/UI Design*
