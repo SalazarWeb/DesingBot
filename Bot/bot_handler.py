@@ -52,28 +52,22 @@ class BotHandler:
             else message_or_call.message.chat.id
         )
 
-        # Teclado mejorado con botones más accesibles y organizados
+        # Teclado simplificado con solo las 4 categorías esenciales
         keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
         
         # Primera fila: Categorías principales de investigación y patrones
         keyboard.add(
-            types.KeyboardButton("🔍 UX Research"),
+            types.KeyboardButton("🔬 UX Research"),
             types.KeyboardButton("🎨 UI Patterns")
         )
         
-        # Segunda fila: Sistemas y casos de estudio  
+        # Segunda fila: Sistemas y herramientas
         keyboard.add(
             types.KeyboardButton("🎯 Design Systems"), 
-            types.KeyboardButton("📋 Case Studies")
+            types.KeyboardButton("🛠️ Herramientas")
         )
         
-        # Tercera fila: Herramientas y accesibilidad
-        keyboard.add(
-            types.KeyboardButton("🛠️ Herramientas"),
-            types.KeyboardButton("♿ Accesibilidad")
-        )
-        
-        # Cuarta fila: Funciones de búsqueda y ayuda
+        # Tercera fila: Funciones de búsqueda y ayuda
         keyboard.add(
             types.KeyboardButton("🔍 Búsqueda"), 
             types.KeyboardButton("❓ Ayuda")
@@ -83,17 +77,16 @@ class BotHandler:
             "🎨 **DesignBot - Tu experto en UX/UI**\n\n"
             "¡Hola! Soy tu asistente especializado en diseño UX/UI.\n\n"
             "**📱 Categorías disponibles:**\n"
-            "• 🔍 **UX Research** - Investigación, métodos, análisis\n"
+            "• 🔬 **UX Research** - Investigación, métodos, análisis\n"
             "• 🎨 **UI Patterns** - Componentes, interfaces, tokens\n"
             "• 🎯 **Design Systems** - Guías, bibliotecas, estándares\n"
-            "• 📋 **Case Studies** - Casos reales, análisis\n"
-            "• 🛠️ **Herramientas** - Figma, Sketch, Adobe XD\n"
-            "• ♿ **Accesibilidad** - WCAG, diseño inclusivo\n\n"
+            "• 🛠️ **Herramientas** - Figma, Sketch, Adobe XD\n\n"
+
             "**⚡ Comandos rápidos:**\n"
-            "• `/design [consulta]` - Principios de diseño\n"
-            "• `/ux [consulta]` - Experiencia de usuario\n"
-            "• `/ui [consulta]` - Interfaces y patrones\n"
-            "• `/search [tema]` - Buscar recursos específicos\n\n"
+            "• `/design` - Principios de diseño\n"
+            "• `/ux` - Experiencia de usuario\n"
+            "• `/ui` - Interfaces y patrones\n"
+            "• `/search` - Buscar recursos específicos\n\n"
             "💡 Usa los botones del menú o escribe comandos directamente."
         )
 
@@ -435,22 +428,23 @@ class BotHandler:
         help_text = (
             "🎨 **Comandos de UX/UI Design:**\n\n"
             "**📋 Consultas especializadas:**\n"
-            "• `/design [consulta]` - Principios y teoría del diseño\n"
-            "• `/ux [consulta]` - Research y experiencia de usuario\n"
-            "• `/ui [consulta]` - Interfaces y patrones visuales\n"
-            "• `/tools [consulta]` - Herramientas (Figma, Sketch, etc.)\n\n"
+            "• `/design` - Principios y teoría del diseño\n"
+            "• `/ux` - Research y experiencia de usuario\n"
+            "• `/ui` - Interfaces y patrones visuales\n"
+            "• `/tools` - Herramientas (Figma, Sketch, etc.)\n\n"
+
             "**🔍 Búsqueda y consultas:**\n"
-            "• `/search [consulta]` - Buscar en recursos especializados\n"
-            "• `/ask [pregunta]` - Consultas generales de diseño\n\n"
+            "• `/search` - Buscar en recursos especializados\n"
+            "• `/ask` - Consultas generales de diseño\n\n"
             "**📚 Categorías disponibles:**\n"
             "Usa los botones del menú para explorar recursos organizados."
         )
 
         keyboard = types.InlineKeyboardMarkup()
-        # Usar solo las categorías esenciales
+        # Solo las 4 categorías esenciales
         keyboard.add(
             types.InlineKeyboardButton(
-                "🔍 UX Research", callback_data="list_ux_research"
+                "🔬 UX Research", callback_data="list_ux_research"
             )
         )
         keyboard.add(
@@ -465,17 +459,7 @@ class BotHandler:
         )
         keyboard.add(
             types.InlineKeyboardButton(
-                "📋 Case Studies", callback_data="list_case_studies"
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
                 "🛠️ Herramientas", callback_data="list_tools_guides"
-            )
-        )
-        keyboard.add(
-            types.InlineKeyboardButton(
-                "♿ Accesibilidad", callback_data="list_accessibility"
             )
         )
 
@@ -488,16 +472,12 @@ class BotHandler:
         category = call.data.replace("list_", "")
         chat_id = call.message.chat.id
 
-        # Mapeo de categorías a carpetas
+        # Mapeo de categorías a carpetas (solo las 4 categorías esenciales)
         folder_mapping = {
             "ux_research": "UX_Research",
             "ui_patterns": "UI_Patterns", 
             "design_systems": "Design_Systems",
-            "case_studies": "Case_Studies",
-            "tools_guides": "Tools_Guides",
-            "accessibility": "Accessibility",
-            "prototyping": "Prototyping",
-            "user_testing": "User_Testing"
+            "tools_guides": "Tools_Guides"
         }
 
         folder = folder_mapping.get(category)
@@ -533,11 +513,12 @@ class BotHandler:
                 types.InlineKeyboardButton("⬅️ Volver", callback_data="back_main")
             )
 
+            # Solo las categorías esenciales
             category_names = {
                 "ux_research": "UX Research",
                 "ui_patterns": "UI Patterns",
                 "design_systems": "Design Systems", 
-                "case_studies": "Case Studies"
+                "tools_guides": "Tools & Guides"
             }
 
             self.bot.send_message(
@@ -589,16 +570,14 @@ class BotHandler:
         # Responder a mensajes especiales del teclado
         text_lower = text.lower()
         design_categories = {
-            "🔍 ux research": "ux_research",
+            "🔬 ux research": "ux_research",
             "🎨 ui patterns": "ui_patterns", 
             "🎯 design systems": "design_systems",
-            "📋 case studies": "case_studies",
-            "🛠️ herramientas": "tools_guides",
-            "♿ accesibilidad": "accessibility"
+            "🛠️ herramientas": "tools_guides"
         }
         
         for key, category in design_categories.items():
-            if text_lower in [key, key.replace("🔍 ", "").replace("🎨 ", "").replace("🎯 ", "").replace("📋 ", "").replace("🛠️ ", "").replace("♿ ", "")]:
+            if text_lower in [key, key.replace("🔬 ", "").replace("🎨 ", "").replace("🎯 ", "").replace("🛠️ ", "")]:
                 keyboard = types.InlineKeyboardMarkup()
                 keyboard.add(
                     types.InlineKeyboardButton(
@@ -608,12 +587,10 @@ class BotHandler:
                 
                 # Usar las nuevas descripciones de categorías desde constants
                 category_descriptions = {
-                    "ux_research": f"🔍 **UX Research** - {CATEGORY_DESCRIPTIONS['UX_RESEARCH']}",
+                    "ux_research": f"🔬 **UX Research** - {CATEGORY_DESCRIPTIONS['UX_RESEARCH']}",
                     "ui_patterns": f"🎨 **UI Patterns** - {CATEGORY_DESCRIPTIONS['UI_PATTERNS']}",
-                    "design_systems": f"🎯 **Design Systems** - {CATEGORY_DESCRIPTIONS['DESIGN_SYSTEMS']}", 
-                    "case_studies": f"📋 **Case Studies** - {CATEGORY_DESCRIPTIONS['CASE_STUDIES']}",
-                    "tools_guides": f"🛠️ **Herramientas** - {CATEGORY_DESCRIPTIONS['TOOLS_GUIDES']}",
-                    "accessibility": f"♿ **Accesibilidad** - {CATEGORY_DESCRIPTIONS['ACCESSIBILITY']}"
+                    "design_systems": f"🎯 **Design Systems** - {CATEGORY_DESCRIPTIONS['DESIGN_SYSTEMS']}",
+                    "tools_guides": f"🛠️ **Herramientas** - {CATEGORY_DESCRIPTIONS['TOOLS_GUIDES']}"
                 }
                 
                 self.bot.send_message(
@@ -628,11 +605,12 @@ class BotHandler:
             self.bot.send_message(
                 message.chat.id,
                 "🔍 **Búsqueda especializada en UX/UI:**\n\n"
-                "• `/search [tema]` - Buscar en recursos de diseño\n"
-                "• `/design [consulta]` - Principios de diseño\n"
-                "• `/ux [consulta]` - Experiencia de usuario\n"
-                "• `/ui [consulta]` - Interfaces y patrones\n"
-                "• `/tools [herramienta]` - Guías de herramientas\n\n"
+                "• `/search` - Buscar en recursos de diseño\n"
+                "• `/design` - Principios de diseño\n"
+                "• `/ux` - Experiencia de usuario\n"
+                "• `/ui` - Interfaces y patrones\n"
+                "• `/tools` - Guías de herramientas\n\n"
+
                 "📝 *Ejemplo:* `/search atomic design`",
                 parse_mode="Markdown",
             )
@@ -647,13 +625,13 @@ class BotHandler:
             message.chat.id,
             "🎨 **¿Qué quieres diseñar hoy?**\n\n"
             "**Comandos especializados:**\n"
-            "• `/design [consulta]` - Principios y teoría\n"
-            "• `/ux [consulta]` - Research y usabilidad\n" 
-            "• `/ui [consulta]` - Interfaces y patrones\n"
+            "• `/design` - Principios y teoría\n"
+            "• `/ux` - Research y usabilidad\n" 
+            "• `/ui` - Interfaces y patrones\n"
             "• `/tools [herramienta]` - Guías de Figma, Sketch, etc.\n\n"
             "**Búsqueda:**\n"
-            "• `/search [tema]` - Buscar recursos específicos\n"
-            "• `/ask [pregunta]` - Consulta general\n\n"
+            "• `/search` - Buscar recursos específicos\n"
+            "• `/ask` - Consulta general\n\n"
             "💡 *Tip:* Usa los botones del menú para explorar por categorías.",
             parse_mode="Markdown",
         )

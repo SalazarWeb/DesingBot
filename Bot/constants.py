@@ -15,19 +15,15 @@ DESIGN_CATEGORIES = {
     "UX_RESEARCH": "UX Research",
     "UI_PATTERNS": "UI Patterns", 
     "DESIGN_SYSTEMS": "Design Systems",
-    "CASE_STUDIES": "Case Studies",
-    "TOOLS_GUIDES": "Tools & Guides",
-    "ACCESSIBILITY": "Accessibility"
+    "TOOLS_GUIDES": "Tools & Guides"
 }
 
 # Mapeo de categorías a emojis más claros y accesibles
 CATEGORY_EMOJIS = {
-    "UX_RESEARCH": "🔍",          # Lupa para investigación
+    "UX_RESEARCH": "🔬",          # Microscopio para investigación
     "UI_PATTERNS": "🎨",          # Paleta para patrones visuales  
     "DESIGN_SYSTEMS": "🎯",       # Diana para sistemas organizados
-    "CASE_STUDIES": "📋",         # Clipboard para casos de estudio
-    "TOOLS_GUIDES": "🛠️",         # Herramientas
-    "ACCESSIBILITY": "♿"          # Accesibilidad universal
+    "TOOLS_GUIDES": "🛠️"          # Herramientas
 }
 
 # Descripciones claras para cada categoría (para mejorar accesibilidad)
@@ -35,9 +31,7 @@ CATEGORY_DESCRIPTIONS = {
     "UX_RESEARCH": "Investigación de usuarios, métodos, análisis",
     "UI_PATTERNS": "Componentes, interfaces, patrones visuales",
     "DESIGN_SYSTEMS": "Guías de estilo, bibliotecas de componentes", 
-    "CASE_STUDIES": "Casos reales, análisis de productos",
-    "TOOLS_GUIDES": "Tutoriales de Figma, Sketch, Adobe XD",
-    "ACCESSIBILITY": "Diseño inclusivo, WCAG, mejores prácticas"
+    "TOOLS_GUIDES": "Tutoriales de Figma, Sketch, Adobe XD"
 }
 
 # Herramientas de diseño soportadas
