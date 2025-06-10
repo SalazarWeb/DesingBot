@@ -1,13 +1,4 @@
 pyTelegramBotAPI==4.27.0
-flask==2.3.3
-pymupdf
-requests
-python-dotenv
-numpy
-pytesseract
-pillow
-langchain
-scikit-learn
-pyPDF2
-urllib3
-requests[security]
+flask==2.3.3  
+requests==2.31.0
+python-dotenv==1.0.0
