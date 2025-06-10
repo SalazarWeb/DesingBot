@@ -145,7 +145,8 @@ def register_handlers(bot, bot_handler: BotHandler):
             bot_handler.show_help(message)
         else:
             logger.info(f"Mensaje de texto recibido de usuario {message.from_user.id} ({len(message.text)} caracteres)")
-            bot_handler.handle_message(message)
+            # Tratar mensajes de texto como preguntas generales
+            bot_handler.handle_general_question(message)
 
     elapsed_time = time.time() - start_time
     logger.info(f"Registrados manejadores de DesignBot en {elapsed_time:.2f} segundos")
@@ -166,21 +167,20 @@ def main():
 
     try:
         logger.info("Inicializando cliente de Telegram...")
-        # Inicializar el bot sin parse_mode Markdown para evitar errores de formato
         bot = telebot.TeleBot(token, parse_mode=None, threaded=True)
         bot.skip_pending = True
         logger.info("Bot telebot inicializado correctamente")
 
         logger.info("Creando instancia de BotHandler...")
         start_time = time.time()
-        bot_handler = BotHandler(bot=bot)  # Pasar la instancia del bot al handler
+        bot_handler = BotHandler(bot=bot)
         elapsed_time = time.time() - start_time
         logger.info(f"BotHandler inicializado en {elapsed_time:.2f} segundos")
 
         logger.info("Registrando handlers...")
         register_handlers(bot, bot_handler)
 
-        # Inicio del bot con mensaje mejorado
+        
         logger.info("Bot completamente configurado y listo para recibir mensajes")
         logger.info("Iniciando infinity_polling...")
         print("🎨 DesignBot UX/UI con funcionalidades avanzadas iniciando...")

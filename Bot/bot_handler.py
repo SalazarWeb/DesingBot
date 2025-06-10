@@ -14,6 +14,33 @@ from core.admin_service import AdminService
 from ai_embedding.adaptive_ai import AdaptiveAIService
 
 
+def sanitize_markdown(text):
+    """Sanitiza el texto para evitar errores de markdown en Telegram"""
+    if not text:
+        return ""
+    
+    # Si el texto es muy largo, dividirlo en partes
+    if len(text) > 4000:
+        parts = []
+        current_part = ""
+        
+        lines = text.split('\n')
+        for line in lines:
+            if len(current_part + line + '\n') > 4000:
+                if current_part:
+                    parts.append(current_part.strip())
+                current_part = line + '\n'
+            else:
+                current_part += line + '\n'
+        
+        if current_part:
+            parts.append(current_part.strip())
+        
+        return parts
+    
+    return text
+
+
 class BotHandler:
     def __init__(self, bot=None):
         """
@@ -1057,6 +1084,315 @@ class BotHandler:
             )
 
     # Métodos auxiliares existentes continúan...
+    def show_help(self, message_or_call):
+        """Muestra mensaje de ayuda completo"""
+        help_text = (
+            "🎨 **DesignBot - Tu Asistente de UX/UI**\n\n"
+            "**🚀 Comandos Principales:**\n"
+            "• `/start` - Comenzar e inicializar perfil\n"
+            "• `/help` - Mostrar esta ayuda\n\n"
+            "**💬 Consultas Especializadas:**\n"
+            "• `/design [pregunta]` - Consultas generales de diseño\n"
+            "• `/ux [pregunta]` - Preguntas específicas sobre UX\n"
+            "• `/ui [pregunta]` - Preguntas específicas sobre UI\n"
+            "• `/tools [pregunta]` - Información sobre herramientas\n"
+            "• `/ask [pregunta]` - Preguntas generales\n\n"
+            "**🔍 Búsqueda Avanzada:**\n"
+            "• `/search [término]` - Buscar en base de conocimientos\n"
+            "• `/trending` - Ver búsquedas populares\n\n"
+            "**⚙️ Personalización:**\n"
+            "• `/preferences` - Configurar perfil\n"
+            "• `/analytics` - Ver tus estadísticas\n"
+            "• `/tips` - Consejos personalizados\n\n"
+            "**📚 Recursos:**\n"
+            "• `/list` - Explorar categorías de recursos\n\n"
+            "💡 **Tip:** También puedes escribir directamente tus preguntas sin comandos."
+        )
+        
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(
+            types.InlineKeyboardButton("🔍 Buscar recursos", callback_data="quick_search_help"),
+            types.InlineKeyboardButton("⚙️ Configurar perfil", callback_data="show_preferences")
+        )
+        
+        if hasattr(message_or_call, 'chat'):
+            # Es un mensaje
+            self.bot.send_message(
+                message_or_call.chat.id,
+                help_text,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+        else:
+            # Es un callback
+            try:
+                self.bot.edit_message_text(
+                    help_text,
+                    message_or_call.message.chat.id,
+                    message_or_call.message.message_id,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+            except:
+                self.bot.send_message(
+                    message_or_call.message.chat.id,
+                    help_text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+
+    def list_categories(self, message):
+        """Muestra categorías de recursos disponibles"""
+        categories_text = (
+            "📚 **Explora Recursos por Categoría**\n\n"
+            "Selecciona una categoría para ver los recursos disponibles:"
+        )
+        
+        keyboard = types.InlineKeyboardMarkup()
+        
+        # Crear botones para cada categoría
+        categories = [
+            ("ux_research", "🔬 UX Research"),
+            ("ui_patterns", "🖼️ UI Patterns"),
+            ("design_systems", "🎯 Design Systems"),
+            ("tools_guides", "🛠️ Tools & Guides"),
+            ("prototyping", "🔧 Prototyping"),
+            ("accessibility", "♿ Accessibility")
+        ]
+        
+        for cat_id, cat_name in categories:
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    cat_name,
+                    callback_data=f"list_{cat_id}"
+                )
+            )
+        
+        keyboard.add(
+            types.InlineKeyboardButton("🔍 Búsqueda libre", callback_data="search_help")
+        )
+        
+        self.bot.send_message(
+            message.chat.id,
+            categories_text,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+
+    def handle_list(self, call):
+        """Maneja la selección de categorías de recursos"""
+        category = call.data.replace("list_", "")
+        
+        category_info = {
+            "ux_research": {
+                "name": "🔬 UX Research",
+                "description": "Métodos y técnicas de investigación de usuarios",
+                "topics": [
+                    "User interviews y encuestas",
+                    "Personas y user journey mapping",
+                    "Usability testing y análisis",
+                    "Research synthesis y insights"
+                ]
+            },
+            "ui_patterns": {
+                "name": "🖼️ UI Patterns",
+                "description": "Patrones de interfaz y componentes de diseño",
+                "topics": [
+                    "Navigation patterns",
+                    "Form design y inputs",
+                    "Cards y layouts",
+                    "Micro-interactions"
+                ]
+            },
+            "design_systems": {
+                "name": "🎯 Design Systems",
+                "description": "Sistemas de diseño y componentes reutilizables",
+                "topics": [
+                    "Atomic design methodology",
+                    "Design tokens y variables",
+                    "Component libraries",
+                    "Documentation y governance"
+                ]
+            },
+            "tools_guides": {
+                "name": "🛠️ Tools & Guides",
+                "description": "Guías de herramientas de diseño",
+                "topics": [
+                    "Figma advanced features",
+                    "Sketch workflows",
+                    "Adobe XD prototyping",
+                    "Design handoff tools"
+                ]
+            },
+            "prototyping": {
+                "name": "🔧 Prototyping",
+                "description": "Técnicas de prototipado y testing",
+                "topics": [
+                    "Low-fi wireframing",
+                    "Interactive prototypes",
+                    "Animation y transitions",
+                    "Prototype testing"
+                ]
+            },
+            "accessibility": {
+                "name": "♿ Accessibility",
+                "description": "Diseño inclusivo y accesibilidad",
+                "topics": [
+                    "WCAG guidelines",
+                    "Color y contrast",
+                    "Screen reader optimization",
+                    "Inclusive design patterns"
+                ]
+            }
+        }
+        
+        if category in category_info:
+            info = category_info[category]
+            
+            detail_text = (
+                f"{info['name']}\n\n"
+                f"📋 **Descripción:**\n{info['description']}\n\n"
+                f"📚 **Temas principales:**\n"
+            )
+            
+            for topic in info['topics']:
+                detail_text += f"• {topic}\n"
+            
+            detail_text += (
+                f"\n💡 **Sugerencias:**\n"
+                f"• Usa `/search [tema]` para buscar contenido específico\n"
+                f"• Combina términos para búsquedas más precisas\n"
+                f"• Explora recursos relacionados en otras categorías"
+            )
+            
+            keyboard = types.InlineKeyboardMarkup()
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    f"🔍 Buscar en {info['name']}",
+                    callback_data=f"quick_search_{category}"
+                )
+            )
+            keyboard.add(
+                types.InlineKeyboardButton("⬅️ Volver a categorías", callback_data="back_categories"),
+                types.InlineKeyboardButton("🏠 Menú principal", callback_data="show_help")
+            )
+            
+            try:
+                self.bot.edit_message_text(
+                    detail_text,
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+            except:
+                self.bot.send_message(
+                    call.message.chat.id,
+                    detail_text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+        else:
+            self.bot.answer_callback_query(call.id, "Categoría no encontrada")
+
+    def handle_pdf_download(self, call):
+        """Maneja la descarga de documentos PDF"""
+        try:
+            doc_path = call.data.replace("download#", "")
+            full_path = os.path.join(DOCUMENTS_FOLDER, doc_path)
+            
+            if os.path.exists(full_path) and full_path.endswith('.pdf'):
+                # Obtener información del archivo
+                file_size = os.path.getsize(full_path)
+                file_name = os.path.basename(full_path)
+                
+                # Verificar tamaño del archivo (límite de Telegram: 50MB)
+                if file_size > 50 * 1024 * 1024:
+                    self.bot.answer_callback_query(
+                        call.id,
+                        "❌ Archivo demasiado grande para descargar por Telegram"
+                    )
+                    return
+                
+                # Enviar el archivo
+                with open(full_path, 'rb') as doc:
+                    self.bot.send_document(
+                        call.message.chat.id,
+                        doc,
+                        caption=f"📄 **{file_name}**\n\n💡 Descargado desde DesignBot",
+                        parse_mode="Markdown"
+                    )
+                
+                self.bot.answer_callback_query(call.id, "✅ Descarga iniciada")
+                
+                # Actualizar analytics
+                user_id = call.from_user.id
+                self.admin_service.update_analytics('download', {
+                    'user_id': user_id,
+                    'file_name': file_name,
+                    'file_size': file_size,
+                    'success': True
+                })
+                
+            else:
+                self.bot.answer_callback_query(call.id, "❌ Archivo no encontrado")
+                
+        except Exception as e:
+            self.logger.error(f"Error en handle_pdf_download: {str(e)}")
+            self.bot.answer_callback_query(call.id, "❌ Error al descargar archivo")
+
+    def handle_back(self, call):
+        """Maneja la navegación hacia atrás"""
+        action = call.data.replace("back_", "")
+        
+        if action == "categories":
+            # Volver a la lista de categorías
+            categories_text = (
+                "📚 **Explora Recursos por Categoría**\n\n"
+                "Selecciona una categoría para ver los recursos disponibles:"
+            )
+            
+            keyboard = types.InlineKeyboardMarkup()
+            
+            categories = [
+                ("ux_research", "🔬 UX Research"),
+                ("ui_patterns", "🖼️ UI Patterns"),
+                ("design_systems", "🎯 Design Systems"),
+                ("tools_guides", "🛠️ Tools & Guides"),
+                ("prototyping", "🔧 Prototyping"),
+                ("accessibility", "♿ Accessibility")
+            ]
+            
+            for cat_id, cat_name in categories:
+                keyboard.add(
+                    types.InlineKeyboardButton(
+                        cat_name,
+                        callback_data=f"list_{cat_id}"
+                    )
+                )
+            
+            keyboard.add(
+                types.InlineKeyboardButton("🔍 Búsqueda libre", callback_data="search_help")
+            )
+            
+            try:
+                self.bot.edit_message_text(
+                    categories_text,
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+            except:
+                self.bot.send_message(
+                    call.message.chat.id,
+                    categories_text,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+        else:
+            self.bot.answer_callback_query(call.id, "Acción no reconocida")
+
     def find_pdf_files(self, directory):
         """Encuentra todos los archivos PDF en el directorio y subdirectorios"""
         pdf_files = []

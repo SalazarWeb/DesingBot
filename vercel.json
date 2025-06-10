@@ -1,17 +1,22 @@
 {
-  "functions": {
-    "api/webhook.py": {
-      "runtime": "python3.9"
-    }
-  },
-  "env": {
-    "TOKEN": "@token"
-  },
-  "regions": ["iad1"],
-  "rewrites": [
+  "builds": [
     {
-      "source": "/webhook",
-      "destination": "/api/webhook"
+      "src": "api/webhook.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/webhook",
+      "dest": "/api/webhook"
+    },
+    {
+      "src": "/health", 
+      "dest": "/api/webhook"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/webhook"
     }
   ]
 }

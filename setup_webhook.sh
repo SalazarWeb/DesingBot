@@ -1,66 +1,51 @@
-#!/bin/bash
+# Script para configurar el webhook de Telegram con Vercel
+echo "🔧 Configurando webhook de DesignBot..."
 
-# Script para configurar el webhook de Telegram para Vercel
-# Uso: ./setup_webhook.sh https://tu-bot.vercel.app
-
-if [ -z "$1" ]; then
-    echo "❌ Error: Debes proporcionar la URL de tu aplicación en Vercel"
-    echo ""
-    echo "Uso: ./setup_webhook.sh https://tu-bot.vercel.app"
-    echo ""
-    echo "Pasos:"
-    echo "1. Despliega tu bot en Vercel"
-    echo "2. Copia la URL que te da Vercel"
-    echo "3. Ejecuta: ./setup_webhook.sh https://tu-url.vercel.app"
+# Verificar que existe el archivo .env
+if [ ! -f .env ]; then
+    echo "❌ Error: No se encontró el archivo .env"
+    echo "Crea un archivo .env con tu TOKEN de Telegram:"
+    echo "TOKEN=tu_token_aqui"
     exit 1
 fi
 
-VERCEL_URL="$1"
-WEBHOOK_URL="${VERCEL_URL}/webhook"
-
-# Cargar TOKEN desde .env si existe
-if [ -f ".env" ]; then
-    export $(cat .env | grep -v '^#' | xargs)
-fi
+# Cargar variables de entorno
+source .env
 
 if [ -z "$TOKEN" ]; then
-    echo "❌ Error: TOKEN no encontrado"
-    echo "Por favor:"
-    echo "1. Crea un archivo .env con: TOKEN=tu_token_de_botfather"
-    echo "2. O ejecuta: export TOKEN=tu_token_de_botfather"
+    echo "❌ Error: TOKEN no está definido en .env"
     exit 1
 fi
 
-echo "🔗 Configurando webhook para DesignBot..."
-echo "📡 URL del webhook: $WEBHOOK_URL"
-echo ""
+# Obtener la URL de Vercel (debes reemplazar esto con tu URL real)
+read -p "Ingresa tu URL de Vercel (ej: https://tu-app.vercel.app): " VERCEL_URL
+
+if [ -z "$VERCEL_URL" ]; then
+    echo "❌ Error: URL de Vercel requerida"
+    exit 1
+fi
 
 # Configurar webhook
-response=$(curl -s -X POST "https://api.telegram.org/bot$TOKEN/setWebhook" \
+WEBHOOK_URL="${VERCEL_URL}/webhook"
+API_URL="https://api.telegram.org/bot${TOKEN}/setWebhook"
+
+echo "📡 Configurando webhook en: $WEBHOOK_URL"
+
+# Enviar request para configurar webhook
+response=$(curl -s -X POST "$API_URL" \
     -H "Content-Type: application/json" \
     -d "{\"url\":\"$WEBHOOK_URL\"}")
 
-# Verificar respuesta
-if echo "$response" | grep -q '"ok":true'; then
-    echo "✅ ¡Webhook configurado exitosamente!"
-    echo ""
-    echo "📊 Información del webhook:"
-    curl -s "https://api.telegram.org/bot$TOKEN/getWebhookInfo" | \
-        python3 -m json.tool
-    echo ""
-    echo "🎉 ¡Tu bot ya está funcionando en Vercel!"
-    echo "🔗 URL de salud: ${VERCEL_URL}/health"
-else
-    echo "❌ Error configurando webhook:"
-    echo "$response" | python3 -m json.tool
-    exit 1
-fi
+echo "📋 Respuesta de Telegram:"
+echo "$response" | python3 -m json.tool
+
+# Verificar estado del webhook
+echo ""
+echo "🔍 Verificando estado del webhook..."
+curl -s "https://api.telegram.org/bot${TOKEN}/getWebhookInfo" | python3 -m json.tool
 
 echo ""
-echo "🚀 ¡Bot desplegado exitosamente!"
-echo ""
-echo "URLs importantes:"
-echo "- Bot: https://t.me/$(curl -s "https://api.telegram.org/bot$TOKEN/getMe" | grep -o '"username":"[^"]*"' | cut -d'"' -f4)"
-echo "- Webhook: $WEBHOOK_URL"
-echo "- Health: ${VERCEL_URL}/health"
-echo "- Dashboard: $VERCEL_URL"
+echo "✅ Configuración completada!"
+echo "🌐 Tu bot ahora debería estar funcionando 24/7 en: $VERCEL_URL"
+echo "🔗 Webhook URL: $WEBHOOK_URL"
+echo "💡 Prueba enviando un mensaje a tu bot en Telegram"

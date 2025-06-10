@@ -3,7 +3,7 @@
 # Script para ejecutar DesignBot en segundo plano
 # Uso: ./start_bot_background.sh [start|stop|restart|status]
 
-BOT_DIR="/home/salazar/Descargas/DesingBot"
+BOT_DIR="/home/salazar/Documentos/Proyectos/DesingBot"
 PID_FILE="$BOT_DIR/bot.pid"
 LOG_FILE="$BOT_DIR/logs/bot_background.log"
 
@@ -22,7 +22,7 @@ start_bot() {
     cd "$BOT_DIR"
     
     # Activar entorno virtual y ejecutar en segundo plano
-    nohup bash -c "source venv/bin/activate && python Bot/main.py" > "$LOG_FILE" 2>&1 &
+    nohup bash -c "source venv/bin/activate && python3 Bot/main.py" > "$LOG_FILE" 2>&1 &
     
     # Guardar PID
     echo $! > "$PID_FILE"
