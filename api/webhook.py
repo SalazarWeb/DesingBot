@@ -2,141 +2,218 @@ import os
 import json
 import logging
 from flask import Flask, request, jsonify
-import sys
+import telebot
 
-# Configurar el path para importar módulos
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'Bot'))
-
-# Importar el handler del bot
-try:
-    from Bot.bot_handler import BotHandler
-    import telebot
-except ImportError as e:
-    logging.error(f"Error importando módulos: {e}")
-    # Fallback imports
-    import telebot
-
-# Configurar logging para Vercel
+# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Obtener token desde variables de entorno
 TOKEN = os.environ.get('TOKEN')
 if not TOKEN:
-    logger.error("TOKEN environment variable is required")
+    logger.error("TOKEN no encontrado en variables de entorno")
     raise ValueError("TOKEN environment variable is required")
 
 # Inicializar bot
-bot = telebot.TeleBot(TOKEN)
-
-# Inicializar bot_handler solo si la importación fue exitosa
 try:
-    bot_handler = BotHandler(bot=bot)
-    logger.info("BotHandler inicializado correctamente")
+    bot = telebot.TeleBot(TOKEN)
+    logger.info(f"Bot inicializado correctamente con token: {TOKEN[:10]}...")
 except Exception as e:
-    logger.error(f"Error inicializando BotHandler: {e}")
-    bot_handler = None
+    logger.error(f"Error inicializando bot: {e}")
+    raise
 
 # Crear app Flask
 app = Flask(__name__)
 
-def register_webhook_handlers(bot, bot_handler):
-    """Registra todos los handlers para webhooks"""
-    
-    @bot.message_handler(commands=['start'])
-    def start(message):
-        if bot_handler:
-            bot_handler.start(message)
-        else:
-            bot.reply_to(message, "🤖 ¡Hola! Soy DesignBot, tu asistente de UX/UI. El sistema se está inicializando...")
+# Registrar handlers básicos del bot
+@bot.message_handler(commands=['start'])
+def start_command(message):
+    """Handler para comando /start"""
+    try:
+        welcome_text = """
+🎨 *¡Hola! Soy DesignBot*
 
-    @bot.message_handler(commands=['help'])
-    def help_command(message):
-        if bot_handler:
-            bot_handler.show_help(message)
-        else:
-            help_text = """
+Tu asistente personal de UX/UI Design.
+
+*Comandos disponibles:*
+/help - Ver todos los comandos
+/design - Consejos de diseño
+/ux - Temas de UX
+/ui - Temas de UI
+/tools - Herramientas recomendadas
+
+¡Pregúntame cualquier cosa sobre diseño! 🚀
+"""
+        bot.reply_to(message, welcome_text, parse_mode='Markdown')
+        logger.info(f"Comando /start procesado para usuario: {message.from_user.id}")
+    except Exception as e:
+        logger.error(f"Error en comando /start: {e}")
+        bot.reply_to(message, "❌ Error procesando comando. Intenta de nuevo.")
+
+@bot.message_handler(commands=['help'])
+def help_command(message):
+    """Handler para comando /help"""
+    try:
+        help_text = """
 🎨 *DesignBot - Comandos Disponibles*
 
-/start - Iniciar el bot
-/help - Mostrar esta ayuda
-/design - Preguntas sobre diseño
-/ux - Temas de experiencia de usuario
-/ui - Temas de interfaz de usuario
-/tools - Herramientas de diseño
-/search - Búsqueda en recursos
+📋 *Comandos básicos:*
+• /start - Iniciar el bot
+• /help - Mostrar esta ayuda
+
+🎯 *Comandos de diseño:*
+• /design - Consejos generales de diseño
+• /ux - Experiencia de usuario
+• /ui - Interfaz de usuario
+• /tools - Herramientas recomendadas
+
+💬 *También puedes:*
+• Escribir cualquier pregunta sobre diseño
+• Pedirme consejos específicos
+• Consultar sobre herramientas
+
+¡Estoy aquí para ayudarte con tus proyectos de diseño! 🚀
 """
-            bot.reply_to(message, help_text, parse_mode='Markdown')
+        bot.reply_to(message, help_text, parse_mode='Markdown')
+        logger.info(f"Comando /help procesado para usuario: {message.from_user.id}")
+    except Exception as e:
+        logger.error(f"Error en comando /help: {e}")
+        bot.reply_to(message, "❌ Error mostrando ayuda. Intenta de nuevo.")
 
-    @bot.message_handler(commands=['design', 'ux', 'ui', 'tools', 'ask'])
-    def handle_design_commands(message):
-        if bot_handler:
-            bot_handler.handle_general_question(message)
-        else:
-            bot.reply_to(message, "🔄 El sistema está cargando. Intenta de nuevo en unos segundos.")
+@bot.message_handler(commands=['design', 'ux', 'ui', 'tools'])
+def design_commands(message):
+    """Handler para comandos de diseño"""
+    try:
+        command = message.text.split()[0].lower()
+        
+        responses = {
+            '/design': """
+🎨 *Consejos de Diseño General*
 
-    @bot.message_handler(commands=['search'])
-    def search(message):
-        if bot_handler:
-            bot_handler.handle_embedding_search(message)
-        else:
-            bot.reply_to(message, "🔍 Función de búsqueda temporalmente no disponible.")
+✨ *Principios básicos:*
+• Simplicidad es clave
+• Consistencia visual
+• Jerarquía clara
+• Contraste efectivo
 
-    @bot.message_handler(commands=['list'])
-    def list_command(message):
-        if bot_handler:
-            bot_handler.list_categories(message)
-        else:
-            bot.reply_to(message, "📋 Lista de categorías temporalmente no disponible.")
+🎯 *Tips prácticos:*
+• Menos es más
+• Espacios en blanco son tus amigos
+• Tipografía legible
+• Colores con propósito
 
-    # Handlers para callbacks
-    @bot.callback_query_handler(func=lambda call: True)
-    def callback_query_handler(call):
-        if bot_handler:
-            bot_handler.handle_callback_query(call)
-        else:
-            bot.answer_callback_query(call.id, "Sistema inicializándose...")
+¿Hay algo específico sobre diseño que te gustaría saber?
+""",
+            '/ux': """
+👥 *Experiencia de Usuario (UX)*
 
-    # Handler para mensajes de texto
-    @bot.message_handler(func=lambda message: True, content_types=['text'])
-    def handle_text(message):
+🔍 *Fundamentos UX:*
+• Investigación de usuarios
+• Personas y journey maps
+• Wireframes y prototipos
+• Testing de usabilidad
+
+💡 *Mejores prácticas:*
+• Conoce a tu usuario
+• Diseña para el contexto
+• Haz testing temprano y frecuente
+• Itera basándote en feedback
+
+¿Quieres profundizar en algún tema específico de UX?
+""",
+            '/ui': """
+🖼️ *Interfaz de Usuario (UI)*
+
+🎨 *Elementos UI esenciales:*
+• Botones y navegación
+• Formularios intuitivos
+• Iconografía clara
+• Sistema de colores
+
+⚡ *Principios UI:*
+• Claridad visual
+• Consistencia de patrones
+• Feedback inmediato
+• Accesibilidad
+
+¿Te ayudo con algún componente específico de UI?
+""",
+            '/tools': """
+🛠️ *Herramientas de Diseño Recomendadas*
+
+🎨 *Para UI/UX:*
+• Figma - Diseño colaborativo
+• Adobe XD - Prototipado
+• Sketch - Diseño de interfaces
+• InVision - Prototipos interactivos
+
+🔧 *Para desarrollo:*
+• Zeplin - Handoff a desarrollo
+• Abstract - Control de versiones
+• Principle - Animaciones
+• Lottie - Animaciones web
+
+¿Necesitas ayuda eligiendo una herramienta específica?
+"""
+        }
+        
+        response = responses.get(command, "🤔 No encontré información para ese comando.")
+        bot.reply_to(message, response, parse_mode='Markdown')
+        logger.info(f"Comando {command} procesado para usuario: {message.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error en comandos de diseño: {e}")
+        bot.reply_to(message, "❌ Error procesando comando. Intenta de nuevo.")
+
+@bot.message_handler(func=lambda message: True, content_types=['text'])
+def handle_text(message):
+    """Handler para mensajes de texto generales"""
+    try:
         if message.text.startswith('/'):
-            help_command(message)
+            # Comando no reconocido
+            bot.reply_to(message, "🤔 Comando no reconocido. Usa /help para ver comandos disponibles.")
         else:
-            if bot_handler:
-                bot_handler.handle_general_question(message)
-            else:
-                bot.reply_to(message, "🤖 Recibí tu mensaje. El sistema se está inicializando, intenta de nuevo en unos segundos.")
+            # Respuesta general a preguntas
+            response = f"""
+🎨 *Hola {message.from_user.first_name}!*
 
-# Registrar handlers
-register_webhook_handlers(bot, bot_handler)
+He recibido tu mensaje: "{message.text[:50]}..."
 
+Puedo ayudarte con:
+• Consejos de diseño (/design)
+• Experiencia de usuario (/ux)  
+• Interfaces de usuario (/ui)
+• Herramientas de diseño (/tools)
+
+¿Sobre qué aspecto del diseño te gustaría saber más?
+"""
+            bot.reply_to(message, response, parse_mode='Markdown')
+            
+        logger.info(f"Mensaje de texto procesado para usuario: {message.from_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error procesando mensaje de texto: {e}")
+        bot.reply_to(message, "❌ Error procesando tu mensaje. Intenta de nuevo.")
+
+# Rutas de la aplicación Flask
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """Endpoint principal para recibir actualizaciones de Telegram"""
     try:
-        # Obtener datos del request
-        update = request.get_json()
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
         
-        if update:
-            # Procesar actualización
-            update_obj = telebot.types.Update.de_json(update)
-            bot.process_new_updates([update_obj])
-            
-            logger.info(f"Webhook procesado exitosamente: {update.get('update_id', 'unknown')}")
-            return jsonify({"status": "ok"})
-        else:
-            logger.warning("Webhook recibido sin datos")
-            return jsonify({"status": "no data"}), 400
-            
+        logger.info(f"Webhook procesado exitosamente: update_id={update.update_id}")
+        return jsonify({"status": "ok", "update_id": update.update_id})
+        
     except Exception as e:
         logger.error(f"Error procesando webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Endpoint de salud para verificar que el servicio está funcionando"""
+    """Endpoint de salud"""
     try:
         bot_info = bot.get_me()
         return jsonify({
@@ -146,52 +223,33 @@ def health():
                 "first_name": bot_info.first_name,
                 "id": bot_info.id
             },
-            "bot_handler_status": "loaded" if bot_handler else "not_loaded",
-            "version": "2.0.0"
+            "webhook_url": request.url_root + "webhook",
+            "version": "3.0.0"
         })
     except Exception as e:
+        logger.error(f"Error en health check: {e}")
         return jsonify({
-            "status": "error",
-            "message": str(e),
-            "bot_handler_status": "loaded" if bot_handler else "not_loaded"
-        })
+            "status": "error", 
+            "message": str(e)
+        }), 500
 
 @app.route('/', methods=['GET'])
 def index():
     """Página principal"""
     return jsonify({
-        "message": "🎨 DesignBot API está funcionando en Vercel!",
+        "message": "🎨 DesignBot API funcionando en Vercel!",
         "status": "online",
         "endpoints": {
-            "webhook": "/webhook (POST)",
-            "health": "/health (GET)"
+            "webhook": "/webhook",
+            "health": "/health"
         },
-        "bot_handler": "loaded" if bot_handler else "not_loaded"
+        "version": "3.0.0"
     })
 
-# Handler para Vercel (serverless)
-def handler(event, context):
-    """Handler principal para Vercel serverless"""
-    try:
-        from werkzeug.wrappers import Request
-        from werkzeug.serving import WSGIRequestHandler
-        
-        # Crear un request wrapper
-        request_wrapper = Request(event)
-        
-        # Procesar con Flask
-        response = app.full_dispatch_request()
-        return {
-            'statusCode': response.status_code,
-            'body': response.get_data(as_text=True),
-            'headers': dict(response.headers)
-        }
-    except Exception as e:
-        logger.error(f"Error en handler de Vercel: {e}")
-        return {
-            'statusCode': 500,
-            'body': json.dumps({'error': str(e)})
-        }
+# Para Vercel (esto es lo que Vercel ejecutará)
+def handler(request, context=None):
+    """Handler para Vercel"""
+    return app(request.environ, lambda status, headers: None)
 
 # Para testing local
 if __name__ == '__main__':
